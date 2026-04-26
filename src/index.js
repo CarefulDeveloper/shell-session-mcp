@@ -1,16 +1,24 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SessionManager } from './session-manager.js';
 import { registerTools } from './tools.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const version = pkg.version;
 
 const log = (msg) => process.stderr.write(`[smart-terminal-mcp] ${msg}\n`);
 
 export function createSandboxServer() {
   const server = new McpServer({
     name: 'smart-terminal-mcp',
-    version: '1.2.29',
+    version,
   });
   const manager = new SessionManager();
   registerTools(server, manager);
@@ -22,7 +30,7 @@ async function main() {
   const manager = new SessionManager();
   const server = new McpServer({
     name: 'smart-terminal-mcp',
-    version: '1.2.29',
+    version,
   });
   registerTools(server, manager);
 

@@ -304,7 +304,7 @@ test('terminal_run shell=true executes commands via the system shell', async () 
   assert.match(payload.stdout.raw, /shell-ok/);
 });
 
-test('terminal_run ENOENT error hints at shell=true and terminal_exec fallback', async () => {
+test('terminal_run ENOENT error hints at shell=true and terminal_start', async () => {
   const server = createFakeServer();
   registerTools(server, {});
 
@@ -314,7 +314,7 @@ test('terminal_run ENOENT error hints at shell=true and terminal_exec fallback',
       args: [],
       parse: false,
     }),
-    /shell:true or use terminal_start \+ terminal_exec/
+    /pass shell:true or start an interactive session with terminal_start/
   );
 });
 

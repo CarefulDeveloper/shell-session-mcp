@@ -470,13 +470,17 @@ export function registerTools(server, manager) {
         args: z.record(z.any()).optional(),
       },
       async (params, extra) => {
-        if (params.list || !params.tool) {
+        if (params.list) {
           const catalog = {};
           for (const [n, def] of _extras) {
             const s = zodToJsonSchema(z.object(def.schema));
             catalog[n] = { description: def.description, parameters: s.properties || {}, required: s.required || [] };
           }
           return jsonContent(catalog);
+        }
+
+        if (!params.tool) {
+          return errorContent(`Pass list=true to see schemas, or specify tool. Available: ${names}`);
         }
 
         const def = _extras.get(params.tool);
