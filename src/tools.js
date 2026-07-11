@@ -336,7 +336,7 @@ export function registerTools(server, manager) {
     'terminal_start',
     'Start a terminal session. Auto-detects shell if omitted.',
     {
-      shell: z.string().optional(),
+      shell: z.string().optional().describe('Absolute shell executable path'),
       cols: z.number().int().min(20).max(500).default(120),
       rows: z.number().int().min(5).max(200).default(30),
       cwd: z.string().optional(),

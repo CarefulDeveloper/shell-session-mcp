@@ -11,7 +11,8 @@
         "type": "object",
         "properties": {
           "shell": {
-            "type": "string"
+            "type": "string",
+            "description": "Absolute shell executable path"
           },
           "cols": {
             "type": "integer",
