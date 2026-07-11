@@ -491,7 +491,7 @@ export function registerTools(server, manager) {
     {
       sessionId: z.string(),
       type: z.enum(['text', 'template']).default('text'),
-      data: z.string().describe('Text or ${file:path}/${env:NAME} template'),
+      data: z.string().describe('Text or template: ${file:path}, ${file:path::L1-L2}, ${file:path::L1:C1-L2:C3}, ${env:NAME}'),
     },
     async ({ sessionId, type, data }) => {
       const session = manager.get(sessionId);
