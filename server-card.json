@@ -183,7 +183,7 @@
           },
           "data": {
             "type": "string",
-            "description": "Text or template: ${file:path}, ${file:path::L1}, ${file:path::L1-L2}, ${file:path::L1:C1-L2:C3}, ${env:NAME}"
+            "description": "Text or template. ${file:path}=whole file; ${file:path::1}=line 1; ${file:path::1-2}=lines 1-2; ${file:path::1:1-2:3}=line/col range; ${env:NAME}=env."
           }
         },
         "required": [

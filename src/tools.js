@@ -191,7 +191,7 @@ function parseTemplateFileSpec(spec) {
   }
 
   const suffix = spec.slice(separator + 2);
-  if (!suffix.startsWith('L')) {
+  if (!/^\d/.test(suffix)) {
     return { path: spec, range: null };
   }
 
@@ -202,7 +202,7 @@ function parseTemplateFileSpec(spec) {
 }
 
 function parseTemplateRange(value) {
-  const match = value.match(/^L(\d+)(?::C(\d+))?(?:-L(\d+)(?::C(\d+))?)?$/);
+  const match = value.match(/^(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?$/);
   if (!match) {
     throw new Error(`Invalid template file range: "${value}".`);
   }
@@ -491,7 +491,7 @@ export function registerTools(server, manager) {
     {
       sessionId: z.string(),
       type: z.enum(['text', 'template']).default('text'),
-      data: z.string().describe('Text or template: ${file:path}, ${file:path::L1}, ${file:path::L1-L2}, ${file:path::L1:C1-L2:C3}, ${env:NAME}'),
+      data: z.string().describe('Text or template. ${file:path}=whole file; ${file:path::1}=line 1; ${file:path::1-2}=lines 1-2; ${file:path::1:1-2:3}=line/col range; ${env:NAME}=env.'),
     },
     async ({ sessionId, type, data }) => {
       const session = manager.get(sessionId);

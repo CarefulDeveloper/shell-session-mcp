@@ -271,14 +271,14 @@ For sensitive input, use `type: "template"` so the MCP server reads local conten
 
 ```text
 ${file:path}
-${file:path::L3}
-${file:path::L3-L5}
-${file:path::L3:C2-L5:C10}
+${file:path::3}
+${file:path::3-5}
+${file:path::3:2-5:10}
 ${env:ENV_NAME}
 $${file:path}
 ```
 
-Relative file paths are resolved from the session CWD. `::L...` selects line and column ranges; line and column numbers are 1-based and inclusive. `CRLF`, `LF`, and `CR` are treated as line separators and are not part of any column. A single-line selection does not include the line ending; a multi-line selection preserves the original line endings between selected lines. `${env:ENV_NAME}` reads an environment variable from the MCP server process. `$${file:path}` writes a literal `${file:path}`.
+Relative file paths are resolved from the session CWD. `::3` selects line 3, `::3-5` selects lines 3 through 5, and `::3:2-5:10` selects from line 3 column 2 through line 5 column 10. Line and column numbers are 1-based and inclusive. `CRLF`, `LF`, and `CR` are treated as line separators and are not part of any column. A single-line selection does not include the line ending; a multi-line selection preserves the original line endings between selected lines. `${env:ENV_NAME}` reads an environment variable from the MCP server process. `$${file:path}` writes a literal `${file:path}`.
 
 **Returns**: `success`, `sessionId`, `type`, `bytes`
 
