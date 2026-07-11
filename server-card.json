@@ -182,7 +182,8 @@
             "default": "text"
           },
           "data": {
-            "type": "string"
+            "type": "string",
+            "description": "Text or ${file:path}/${env:NAME} template"
           }
         },
         "required": [

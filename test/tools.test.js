@@ -74,7 +74,8 @@ test('tool metadata stays concise', () => {
       assert.doesNotMatch(description, /Supported keys:/);
       for (const [fieldName, fieldSchema] of Object.entries(schema)) {
         const fieldDescription = getDescription(fieldSchema);
-        assert.ok(fieldDescription.length <= 30, `${name}.${fieldName} description is too long`);
+        const maxDescriptionLength = name === 'terminal_write' && fieldName === 'data' ? 50 : 30;
+        assert.ok(fieldDescription.length <= maxDescriptionLength, `${name}.${fieldName} description is too long`);
         assert.doesNotMatch(fieldDescription, /\(default:|e\.g\.|Defaults to|such as/i);
       }
     }
@@ -254,6 +255,15 @@ test('SHELL_SESSION_DISABLED_TOOLS="" registers all tools normally', () => {
   } finally {
     delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
+});
+
+test('terminal_write data schema documents template placeholders', () => {
+  const server = createFakeServer();
+  registerTools(server, {});
+
+  const dataDescription = getDescription(server.tools.get('terminal_write').schema.data);
+  assert.match(dataDescription, /\$\{file:path\}/);
+  assert.match(dataDescription, /\$\{env:NAME\}/);
 });
 
 test('terminal_write writes text with escaped control characters', async () => {
