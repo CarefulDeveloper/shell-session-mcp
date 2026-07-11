@@ -74,7 +74,7 @@ test('tool metadata stays concise', () => {
       assert.doesNotMatch(description, /Supported keys:/);
       for (const [fieldName, fieldSchema] of Object.entries(schema)) {
         const fieldDescription = getDescription(fieldSchema);
-        const maxDescriptionLength = name === 'terminal_write' && fieldName === 'data' ? 110 : 30;
+        const maxDescriptionLength = name === 'terminal_write' && fieldName === 'data' ? 130 : 30;
         assert.ok(fieldDescription.length <= maxDescriptionLength, `${name}.${fieldName} description is too long`);
         assert.doesNotMatch(fieldDescription, /\(default:|e\.g\.|Defaults to|such as/i);
       }
@@ -263,6 +263,7 @@ test('terminal_write data schema documents template placeholders', () => {
 
   const dataDescription = getDescription(server.tools.get('terminal_write').schema.data);
   assert.match(dataDescription, /\$\{file:path\}/);
+  assert.match(dataDescription, /\$\{file:path::L1\}/);
   assert.match(dataDescription, /\$\{file:path::L1-L2\}/);
   assert.match(dataDescription, /\$\{file:path::L1:C1-L2:C3\}/);
   assert.match(dataDescription, /\$\{env:NAME\}/);
