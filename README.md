@@ -255,12 +255,31 @@ Run a one-shot non-interactive command using `cmd + args` with `shell=false`. Sa
 
 ### `terminal_write`
 
-Write raw data to a terminal (for interactive programs). Follow with `terminal_read`.
+Write data to a terminal (for interactive programs). Follow with `terminal_read`.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `sessionId` | string | Session ID |
-| `data` | string | Data to write (`\r` for Enter, `\t` for Tab) |
+For sensitive input, use `type: "file"`, `type: "environment"`, or `type: "template"` so the MCP server reads local content and writes it to the PTY without putting the expanded secret value in the tool arguments or response. This does not prevent the terminal program itself from echoing input back into session output.
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `sessionId` | string | *required* | Session ID |
+| `type` | string | `"text"` | Source type: `text`, `file`, `environment`, or `template` |
+| `data` | string | *required* | Text, file path, environment variable name, or template |
+
+`type: "text"` interprets common escape sequences such as `\r`, `\n`, and `\t`. `type: "file"` reads a UTF-8 file relative to the session CWD, or an absolute path. `type: "environment"` reads the named environment variable from the MCP server process.
+
+`type: "template"` expands file placeholders in the template string before writing to the PTY. Supported forms:
+
+```text
+${file:path}
+${file:path::L3}
+${file:path::L3-L5}
+${file:path::L3:C2-L5:C10}
+$${file:path}
+```
+
+Relative file paths are resolved from the session CWD. `::L...` selects line and column ranges; line and column numbers are 1-based and inclusive. `CRLF`, `LF`, and `CR` are treated as line separators and are not part of any column. A single-line selection does not include the line ending; a multi-line selection preserves the original line endings between selected lines. `$${file:path}` writes a literal `${file:path}`.
+
+**Returns**: `success`, `sessionId`, `type`, `bytes`
 
 ### `terminal_read`
 

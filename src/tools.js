@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { writeFile, appendFile, mkdir } from 'node:fs/promises';
+import { writeFile, appendFile, mkdir, readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_TIMEOUT_MS, runCommand } from './command-runner.js';
 import { normalizeCommandName, summarizeCommandOutput } from './command-parsers.js';
@@ -19,6 +19,8 @@ const FS_ERROR_MESSAGES = {
 };
 const READ_ONLY_PAGED_COMMANDS = new Set(['tasklist', 'where', 'which']);
 const READ_ONLY_GIT_SUBCOMMANDS = new Set(['branch', 'diff', 'log', 'ls-files', 'remote', 'rev-parse', 'status']);
+const MAX_TERMINAL_WRITE_SOURCE_BYTES = 1024 * 1024;
+const MAX_TEMPLATE_PLACEHOLDERS = 32;
 
 /**
  * Format a filesystem error into a human-readable message with the error code.
@@ -65,6 +67,266 @@ function assertReadTimeouts(timeout, idleTimeout) {
   if (idleTimeout >= timeout) {
     throw new Error('idleTimeout must be less than timeout.');
   }
+}
+
+async function resolveTerminalWriteData({ type = 'text', data }, session) {
+  if (type === 'text') {
+    return {
+      data: data
+        .replace(/\\r/g, '\r')
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t'),
+      source: 'text',
+    };
+  }
+
+  if (type === 'environment') {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(data)) {
+      throw new Error('Environment variable name is invalid.');
+    }
+    if (!Object.prototype.hasOwnProperty.call(process.env, data)) {
+      throw new Error(`Environment variable "${data}" is not set.`);
+    }
+    return {
+      data: process.env[data] ?? '',
+      source: 'environment',
+    };
+  }
+
+  if (type === 'file') {
+    const absolutePath = resolve(session.cwd, data);
+    let content;
+    try {
+      content = await readFile(absolutePath, 'utf8');
+    } catch (err) {
+      throw new Error(`Failed to read "${absolutePath}": ${formatFsError(err)}`);
+    }
+
+    if (Buffer.byteLength(content, 'utf8') > MAX_TERMINAL_WRITE_SOURCE_BYTES) {
+      throw new Error(`Refusing to write file larger than ${MAX_TERMINAL_WRITE_SOURCE_BYTES} bytes.`);
+    }
+
+    return {
+      data: content,
+      source: 'file',
+    };
+  }
+
+  if (type === 'template') {
+    return {
+      data: await expandTerminalWriteTemplate(data, session),
+      source: 'template',
+    };
+  }
+
+  throw new Error(`Unknown terminal_write type: "${type}".`);
+}
+
+async function expandTerminalWriteTemplate(template, session) {
+  let output = '';
+  let placeholderCount = 0;
+
+  for (let index = 0; index < template.length;) {
+    if (template.startsWith('$${', index)) {
+      output += '${';
+      index += 3;
+      continue;
+    }
+
+    if (!template.startsWith('${', index)) {
+      output += template[index];
+      index++;
+      continue;
+    }
+
+    const end = template.indexOf('}', index + 2);
+    if (end === -1) {
+      throw new Error('Unterminated template placeholder.');
+    }
+
+    placeholderCount++;
+    if (placeholderCount > MAX_TEMPLATE_PLACEHOLDERS) {
+      throw new Error(`Template has more than ${MAX_TEMPLATE_PLACEHOLDERS} placeholders.`);
+    }
+
+    const placeholder = template.slice(index + 2, end);
+    const expanded = await expandTemplatePlaceholder(placeholder, session);
+    output += expanded;
+
+    if (Buffer.byteLength(output, 'utf8') > MAX_TERMINAL_WRITE_SOURCE_BYTES) {
+      throw new Error(`Refusing to write template larger than ${MAX_TERMINAL_WRITE_SOURCE_BYTES} bytes.`);
+    }
+
+    index = end + 1;
+  }
+
+  return output;
+}
+
+async function expandTemplatePlaceholder(placeholder, session) {
+  if (!placeholder.startsWith('file:')) {
+    throw new Error(`Unsupported template placeholder: "${placeholder.split(':', 1)[0]}".`);
+  }
+
+  const { path, range } = parseTemplateFileSpec(placeholder.slice('file:'.length));
+  if (!path) {
+    throw new Error('Template file path is empty.');
+  }
+
+  const absolutePath = resolve(session.cwd, path);
+  let content;
+  try {
+    content = await readFile(absolutePath, 'utf8');
+  } catch (err) {
+    throw new Error(`Failed to read "${absolutePath}": ${formatFsError(err)}`);
+  }
+
+  if (Buffer.byteLength(content, 'utf8') > MAX_TERMINAL_WRITE_SOURCE_BYTES) {
+    throw new Error(`Refusing to read template file larger than ${MAX_TERMINAL_WRITE_SOURCE_BYTES} bytes.`);
+  }
+
+  return range ? selectFileRange(content, range) : content;
+}
+
+function parseTemplateFileSpec(spec) {
+  if (spec.startsWith('"')) {
+    const endQuote = spec.indexOf('"', 1);
+    if (endQuote === -1) {
+      throw new Error('Quoted template file path is unterminated.');
+    }
+    const path = spec.slice(1, endQuote);
+    const rest = spec.slice(endQuote + 1);
+    if (!rest) return { path, range: null };
+    if (!rest.startsWith('::')) {
+      throw new Error('Quoted template file path must be followed by a range or end of placeholder.');
+    }
+    return { path, range: parseTemplateRange(rest.slice(2)) };
+  }
+
+  const separator = spec.lastIndexOf('::');
+  if (separator === -1) {
+    return { path: spec, range: null };
+  }
+
+  const suffix = spec.slice(separator + 2);
+  if (!suffix.startsWith('L')) {
+    return { path: spec, range: null };
+  }
+
+  return {
+    path: spec.slice(0, separator),
+    range: parseTemplateRange(suffix),
+  };
+}
+
+function parseTemplateRange(value) {
+  const match = value.match(/^L(\d+)(?::C(\d+))?(?:-L(\d+)(?::C(\d+))?)?$/);
+  if (!match) {
+    throw new Error(`Invalid template file range: "${value}".`);
+  }
+
+  const startLine = Number(match[1]);
+  const startColumn = match[2] === undefined ? null : Number(match[2]);
+  const endLine = match[3] === undefined ? startLine : Number(match[3]);
+  const endColumn = match[4] === undefined ? null : Number(match[4]);
+
+  if (startLine < 1 || endLine < 1 || endLine < startLine) {
+    throw new Error(`Invalid template file range: "${value}".`);
+  }
+  if ((startColumn === null) !== (endColumn === null)) {
+    throw new Error(`Template file range must use columns on both ends: "${value}".`);
+  }
+  if (startColumn !== null && (startColumn < 1 || endColumn < 1)) {
+    throw new Error(`Invalid template file range: "${value}".`);
+  }
+  if (startLine === endLine && startColumn !== null && endColumn < startColumn) {
+    throw new Error(`Invalid template file range: "${value}".`);
+  }
+
+  return { startLine, startColumn, endLine, endColumn };
+}
+
+function splitLogicalLines(content) {
+  const lines = [];
+  let start = 0;
+
+  for (let index = 0; index < content.length; index++) {
+    const char = content[index];
+    if (char !== '\r' && char !== '\n') continue;
+
+    let eol = char;
+    if (char === '\r' && content[index + 1] === '\n') {
+      eol = '\r\n';
+      index++;
+    }
+
+    lines.push({ text: content.slice(start, index + 1 - eol.length), eol });
+    start = index + 1;
+  }
+
+  if (start < content.length) {
+    lines.push({ text: content.slice(start), eol: '' });
+  }
+
+  return lines;
+}
+
+function selectFileRange(content, range) {
+  const lines = splitLogicalLines(content);
+  const startIndex = range.startLine - 1;
+  const endIndex = range.endLine - 1;
+
+  if (startIndex >= lines.length || endIndex >= lines.length) {
+    throw new Error('Template file range is outside the file.');
+  }
+
+  if (range.startColumn === null) {
+    return selectWholeLineRange(lines, startIndex, endIndex);
+  }
+
+  return selectColumnRange(lines, startIndex, range.startColumn, endIndex, range.endColumn);
+}
+
+function selectWholeLineRange(lines, startIndex, endIndex) {
+  let output = '';
+  for (let index = startIndex; index <= endIndex; index++) {
+    output += lines[index].text;
+    if (index < endIndex) {
+      output += lines[index].eol;
+    }
+  }
+  return output;
+}
+
+function selectColumnRange(lines, startIndex, startColumn, endIndex, endColumn) {
+  let output = '';
+
+  for (let index = startIndex; index <= endIndex; index++) {
+    const chars = Array.from(lines[index].text);
+    let from = 0;
+    let to = chars.length;
+
+    if (index === startIndex) {
+      if (startColumn > chars.length) {
+        throw new Error('Template file range start column is outside the line.');
+      }
+      from = startColumn - 1;
+    }
+
+    if (index === endIndex) {
+      if (endColumn > chars.length) {
+        throw new Error('Template file range end column is outside the line.');
+      }
+      to = endColumn;
+    }
+
+    output += chars.slice(from, to).join('');
+    if (index < endIndex) {
+      output += lines[index].eol;
+    }
+  }
+
+  return output;
 }
 
 /**
@@ -243,20 +505,22 @@ export function registerTools(server, manager) {
   // --- terminal_write ---
   tool(
     'terminal_write',
-    'Write raw data to a terminal session.',
+    'Write data to a terminal session.',
     {
       sessionId: z.string(),
+      type: z.enum(['text', 'file', 'environment', 'template']).default('text'),
       data: z.string(),
     },
-    async ({ sessionId, data }) => {
+    async ({ sessionId, type, data }) => {
       const session = manager.get(sessionId);
-      // Interpret common escape sequences from the string
-      const processed = data
-        .replace(/\\r/g, '\r')
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t');
-      session.write(processed);
-      return jsonContent({ success: true, sessionId });
+      const resolved = await resolveTerminalWriteData({ type, data }, session);
+      session.write(resolved.data);
+      return jsonContent({
+        success: true,
+        sessionId,
+        type: resolved.source,
+        bytes: Buffer.byteLength(resolved.data, 'utf8'),
+      });
     }
   );
 

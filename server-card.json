@@ -166,12 +166,22 @@
     },
     {
       "name": "terminal_write",
-      "description": "Write raw data to a terminal session.",
+      "description": "Write data to a terminal session.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "sessionId": {
             "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "file",
+              "environment",
+              "template"
+            ],
+            "default": "text"
           },
           "data": {
             "type": "string"

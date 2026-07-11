@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { registerTools } from '../src/tools.js';
@@ -253,6 +253,287 @@ test('SHELL_SESSION_DISABLED_TOOLS="" registers all tools normally', () => {
     assert.ok(server.tools.has('terminal_retry'), 'terminal_retry registered normally');
   } finally {
     delete process.env.SHELL_SESSION_DISABLED_TOOLS;
+  }
+});
+
+test('terminal_write writes text with escaped control characters', async () => {
+  const server = createFakeServer();
+  const writes = [];
+  const manager = {
+    get: (sessionId) => ({
+      id: sessionId,
+      cwd: process.cwd(),
+      write: (data) => writes.push(data),
+    }),
+  };
+
+  registerTools(server, manager);
+
+  const result = await server.tools.get('terminal_write').handler({
+    sessionId: 's1',
+    type: 'text',
+    data: 'hello\\n',
+  });
+
+  assert.deepEqual(writes, ['hello\n']);
+  assert.deepEqual(JSON.parse(result.content[0].text), {
+    success: true,
+    sessionId: 's1',
+    type: 'text',
+    bytes: 6,
+  });
+});
+
+test('terminal_write reads file content server-side', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    await writeFile(join(tempDir, 'secret.txt'), 'from-file\n');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    const result = await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'file',
+      data: 'secret.txt',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    assert.deepEqual(writes, ['from-file\n']);
+    assert.deepEqual(payload, {
+      success: true,
+      sessionId: 's1',
+      type: 'file',
+      bytes: 10,
+    });
+    assert.doesNotMatch(result.content[0].text, /from-file/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write expands template file placeholders server-side', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    await writeFile(join(tempDir, 'password.txt'), 'secret-value');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    const result = await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'template',
+      data: 'password=${file:password.txt}\r\n',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    assert.deepEqual(writes, ['password=secret-value\r\n']);
+    assert.deepEqual(payload, {
+      success: true,
+      sessionId: 's1',
+      type: 'template',
+      bytes: 23,
+    });
+    assert.doesNotMatch(result.content[0].text, /secret-value/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write template supports line and column ranges', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    const secretPath = join(tempDir, 'secret.txt');
+    await writeFile(secretPath, 'alpha\r\nbravo\r\ncharlie');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'template',
+      data: 'lines=${file:secret.txt::L1-L2}; cols=${file:secret.txt::L2:C2-L3:C3}',
+    });
+
+    assert.deepEqual(writes, ['lines=alpha\r\nbravo; cols=ravo\r\ncha']);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write template supports absolute Windows-style paths with ranges', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    const secretPath = resolve(tempDir, 'absolute-secret.txt');
+    await writeFile(secretPath, 'first\nsecond\n');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'template',
+      data: `value=${'${'}file:${secretPath}::L2}`,
+    });
+
+    assert.deepEqual(writes, ['value=second']);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write template treats final newline as a line terminator only', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    await writeFile(join(tempDir, 'secret.txt'), 'only-line\r\n');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'template',
+      data: '${file:secret.txt::L1}',
+    });
+
+    await assert.rejects(
+      server.tools.get('terminal_write').handler({
+        sessionId: 's1',
+        type: 'template',
+        data: '${file:secret.txt::L2}',
+      }),
+      /outside the file/
+    );
+    assert.deepEqual(writes, ['only-line']);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write template supports escaped placeholders', async () => {
+  const server = createFakeServer();
+  const writes = [];
+  const manager = {
+    get: (sessionId) => ({
+      id: sessionId,
+      cwd: process.cwd(),
+      write: (data) => writes.push(data),
+    }),
+  };
+
+  registerTools(server, manager);
+
+  await server.tools.get('terminal_write').handler({
+    sessionId: 's1',
+    type: 'template',
+    data: '$${file:secret.txt}',
+  });
+
+  assert.deepEqual(writes, ['${file:secret.txt}']);
+});
+
+test('terminal_write template does not write partial output on expansion failure', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
+  try {
+    await writeFile(join(tempDir, 'secret.txt'), 'secret');
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: tempDir,
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    await assert.rejects(
+      server.tools.get('terminal_write').handler({
+        sessionId: 's1',
+        type: 'template',
+        data: 'before ${file:secret.txt} after ${file:missing.txt}',
+      }),
+      /Failed to read/
+    );
+    assert.deepEqual(writes, []);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('terminal_write reads environment content server-side', async () => {
+  process.env.SHELL_SESSION_MCP_TEST_SECRET = 'from-env\n';
+  try {
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: process.cwd(),
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    const result = await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'environment',
+      data: 'SHELL_SESSION_MCP_TEST_SECRET',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    assert.deepEqual(writes, ['from-env\n']);
+    assert.deepEqual(payload, {
+      success: true,
+      sessionId: 's1',
+      type: 'environment',
+      bytes: 9,
+    });
+    assert.doesNotMatch(result.content[0].text, /from-env/);
+  } finally {
+    delete process.env.SHELL_SESSION_MCP_TEST_SECRET;
   }
 });
 
