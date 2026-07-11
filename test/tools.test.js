@@ -284,42 +284,6 @@ test('terminal_write writes text with escaped control characters', async () => {
   });
 });
 
-test('terminal_write reads file content server-side', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
-  try {
-    await writeFile(join(tempDir, 'secret.txt'), 'from-file\n');
-    const server = createFakeServer();
-    const writes = [];
-    const manager = {
-      get: (sessionId) => ({
-        id: sessionId,
-        cwd: tempDir,
-        write: (data) => writes.push(data),
-      }),
-    };
-
-    registerTools(server, manager);
-
-    const result = await server.tools.get('terminal_write').handler({
-      sessionId: 's1',
-      type: 'file',
-      data: 'secret.txt',
-    });
-
-    const payload = JSON.parse(result.content[0].text);
-    assert.deepEqual(writes, ['from-file\n']);
-    assert.deepEqual(payload, {
-      success: true,
-      sessionId: 's1',
-      type: 'file',
-      bytes: 10,
-    });
-    assert.doesNotMatch(result.content[0].text, /from-file/);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
-});
-
 test('terminal_write expands template file placeholders server-side', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {

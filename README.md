@@ -257,15 +257,15 @@ Run a one-shot non-interactive command using `cmd + args` with `shell=false`. Sa
 
 Write data to a terminal (for interactive programs). Follow with `terminal_read`.
 
-For sensitive input, use `type: "file"` or `type: "template"` so the MCP server reads local content and writes it to the PTY without putting the expanded secret value in the tool arguments or response. This does not prevent the terminal program itself from echoing input back into session output.
+For sensitive input, use `type: "template"` so the MCP server reads local content and writes it to the PTY without putting the expanded secret value in the tool arguments or response. This does not prevent the terminal program itself from echoing input back into session output.
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `sessionId` | string | *required* | Session ID |
-| `type` | string | `"text"` | Source type: `text`, `file`, or `template` |
-| `data` | string | *required* | Text, file path, or template |
+| `type` | string | `"text"` | Source type: `text` or `template` |
+| `data` | string | *required* | Text or template |
 
-`type: "text"` interprets common escape sequences such as `\r`, `\n`, and `\t`. `type: "file"` reads a UTF-8 file relative to the session CWD, or an absolute path.
+`type: "text"` interprets common escape sequences such as `\r`, `\n`, and `\t`.
 
 `type: "template"` expands file and environment placeholders in the template string before writing to the PTY. Supported forms:
 

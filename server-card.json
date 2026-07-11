@@ -177,7 +177,6 @@
             "type": "string",
             "enum": [
               "text",
-              "file",
               "template"
             ],
             "default": "text"

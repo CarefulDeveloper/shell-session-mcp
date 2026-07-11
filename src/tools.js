@@ -80,25 +80,6 @@ async function resolveTerminalWriteData({ type = 'text', data }, session) {
     };
   }
 
-  if (type === 'file') {
-    const absolutePath = resolve(session.cwd, data);
-    let content;
-    try {
-      content = await readFile(absolutePath, 'utf8');
-    } catch (err) {
-      throw new Error(`Failed to read "${absolutePath}": ${formatFsError(err)}`);
-    }
-
-    if (Buffer.byteLength(content, 'utf8') > MAX_TERMINAL_WRITE_SOURCE_BYTES) {
-      throw new Error(`Refusing to write file larger than ${MAX_TERMINAL_WRITE_SOURCE_BYTES} bytes.`);
-    }
-
-    return {
-      data: content,
-      source: 'file',
-    };
-  }
-
   if (type === 'template') {
     return {
       data: await expandTerminalWriteTemplate(data, session),
@@ -509,7 +490,7 @@ export function registerTools(server, manager) {
     'Write data to a terminal session.',
     {
       sessionId: z.string(),
-      type: z.enum(['text', 'file', 'template']).default('text'),
+      type: z.enum(['text', 'template']).default('text'),
       data: z.string(),
     },
     async ({ sessionId, type, data }) => {
