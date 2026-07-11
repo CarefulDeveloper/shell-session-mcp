@@ -80,19 +80,6 @@ async function resolveTerminalWriteData({ type = 'text', data }, session) {
     };
   }
 
-  if (type === 'environment') {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(data)) {
-      throw new Error('Environment variable name is invalid.');
-    }
-    if (!Object.prototype.hasOwnProperty.call(process.env, data)) {
-      throw new Error(`Environment variable "${data}" is not set.`);
-    }
-    return {
-      data: process.env[data] ?? '',
-      source: 'environment',
-    };
-  }
-
   if (type === 'file') {
     const absolutePath = resolve(session.cwd, data);
     let content;
@@ -164,6 +151,10 @@ async function expandTerminalWriteTemplate(template, session) {
 }
 
 async function expandTemplatePlaceholder(placeholder, session) {
+  if (placeholder.startsWith('env:')) {
+    return expandTemplateEnvironmentPlaceholder(placeholder.slice('env:'.length));
+  }
+
   if (!placeholder.startsWith('file:')) {
     throw new Error(`Unsupported template placeholder: "${placeholder.split(':', 1)[0]}".`);
   }
@@ -186,6 +177,16 @@ async function expandTemplatePlaceholder(placeholder, session) {
   }
 
   return range ? selectFileRange(content, range) : content;
+}
+
+function expandTemplateEnvironmentPlaceholder(name) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error('Template environment variable name is invalid.');
+  }
+  if (!Object.prototype.hasOwnProperty.call(process.env, name)) {
+    throw new Error(`Environment variable "${name}" is not set.`);
+  }
+  return process.env[name] ?? '';
 }
 
 function parseTemplateFileSpec(spec) {
@@ -508,7 +509,7 @@ export function registerTools(server, manager) {
     'Write data to a terminal session.',
     {
       sessionId: z.string(),
-      type: z.enum(['text', 'file', 'environment', 'template']).default('text'),
+      type: z.enum(['text', 'file', 'template']).default('text'),
       data: z.string(),
     },
     async ({ sessionId, type, data }) => {

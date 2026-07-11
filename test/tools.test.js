@@ -472,6 +472,41 @@ test('terminal_write template supports escaped placeholders', async () => {
   assert.deepEqual(writes, ['${file:secret.txt}']);
 });
 
+test('terminal_write template expands environment placeholders server-side', async () => {
+  process.env.SHELL_SESSION_MCP_TEST_SECRET = 'from-env';
+  try {
+    const server = createFakeServer();
+    const writes = [];
+    const manager = {
+      get: (sessionId) => ({
+        id: sessionId,
+        cwd: process.cwd(),
+        write: (data) => writes.push(data),
+      }),
+    };
+
+    registerTools(server, manager);
+
+    const result = await server.tools.get('terminal_write').handler({
+      sessionId: 's1',
+      type: 'template',
+      data: 'secret=${env:SHELL_SESSION_MCP_TEST_SECRET}',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    assert.deepEqual(writes, ['secret=from-env']);
+    assert.deepEqual(payload, {
+      success: true,
+      sessionId: 's1',
+      type: 'template',
+      bytes: 15,
+    });
+    assert.doesNotMatch(result.content[0].text, /from-env/);
+  } finally {
+    delete process.env.SHELL_SESSION_MCP_TEST_SECRET;
+  }
+});
+
 test('terminal_write template does not write partial output on expansion failure', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
@@ -502,39 +537,38 @@ test('terminal_write template does not write partial output on expansion failure
   }
 });
 
-test('terminal_write reads environment content server-side', async () => {
-  process.env.SHELL_SESSION_MCP_TEST_SECRET = 'from-env\n';
-  try {
-    const server = createFakeServer();
-    const writes = [];
-    const manager = {
-      get: (sessionId) => ({
-        id: sessionId,
-        cwd: process.cwd(),
-        write: (data) => writes.push(data),
-      }),
-    };
+test('terminal_write template rejects invalid or unset environment placeholders', async () => {
+  const server = createFakeServer();
+  const writes = [];
+  const manager = {
+    get: (sessionId) => ({
+      id: sessionId,
+      cwd: process.cwd(),
+      write: (data) => writes.push(data),
+    }),
+  };
 
-    registerTools(server, manager);
+  registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_write').handler({
+  await assert.rejects(
+    server.tools.get('terminal_write').handler({
       sessionId: 's1',
-      type: 'environment',
-      data: 'SHELL_SESSION_MCP_TEST_SECRET',
-    });
+      type: 'template',
+      data: '${env:BAD-NAME}',
+    }),
+    /environment variable name is invalid/
+  );
 
-    const payload = JSON.parse(result.content[0].text);
-    assert.deepEqual(writes, ['from-env\n']);
-    assert.deepEqual(payload, {
-      success: true,
+  await assert.rejects(
+    server.tools.get('terminal_write').handler({
       sessionId: 's1',
-      type: 'environment',
-      bytes: 9,
-    });
-    assert.doesNotMatch(result.content[0].text, /from-env/);
-  } finally {
-    delete process.env.SHELL_SESSION_MCP_TEST_SECRET;
-  }
+      type: 'template',
+      data: '${env:SHELL_SESSION_MCP_TEST_SECRET_MISSING}',
+    }),
+    /is not set/
+  );
+
+  assert.deepEqual(writes, []);
 });
 
 test('terminal_run forwards summary mode for concise output', async () => {
