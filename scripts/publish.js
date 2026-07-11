@@ -428,7 +428,7 @@ async function discoverTools() {
  */
 function updateServerCard(tools, version) {
   const card = {
-    serverInfo: { name: 'smart-terminal-mcp', version },
+    serverInfo: { name: 'shell-session-mcp', version },
     tools: tools.map(t => ({
       name: t.name,
       description: t.description,
@@ -498,7 +498,7 @@ async function publishToSmithery() {
     const apiKey = process.env.SMITHERY_API_KEY || '';
     const envVars = apiKey ? { SMITHERY_API_KEY: apiKey } : {};
     runCommand(
-      `npx smithery mcp publish "${tunnelUrl}/mcp" -n pungggi/smart-terminal`,
+      `npx smithery mcp publish "${tunnelUrl}/mcp" -n local/shell-session`,
       'Smithery.ai publishing failed.',
       envVars,
     );

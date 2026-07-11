@@ -47,7 +47,7 @@ async function withServerCard() {
   if (original !== null) return () => writeFile(SERVER_CARD_PATH, original);
 
   await writeFile(SERVER_CARD_PATH, JSON.stringify({
-    serverInfo: { name: 'smart-terminal-mcp', version: 'test' },
+    serverInfo: { name: 'shell-session-mcp', version: 'test' },
     tools: [],
     resources: [],
     prompts: [],

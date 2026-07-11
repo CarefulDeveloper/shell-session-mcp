@@ -13,11 +13,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 const version = pkg.version;
 
-const log = (msg) => process.stderr.write(`[smart-terminal-mcp] ${msg}\n`);
+const log = (msg) => process.stderr.write(`[shell-session-mcp] ${msg}\n`);
 
 export function createSandboxServer() {
   const server = new McpServer({
-    name: 'smart-terminal-mcp',
+    name: 'shell-session-mcp',
     version,
   });
   const manager = new SessionManager();
@@ -29,7 +29,7 @@ export default createSandboxServer;
 async function main() {
   const manager = new SessionManager();
   const server = new McpServer({
-    name: 'smart-terminal-mcp',
+    name: 'shell-session-mcp',
     version,
   });
   registerTools(server, manager);
@@ -57,7 +57,7 @@ const isScanning = Boolean(process.env.SMITHERY_SCAN) || scriptPath.includes('.s
 
 if (!isScanning) {
   main().catch((err) => {
-    process.stderr.write(`[smart-terminal-mcp] Fatal: ${err.message}\n${err.stack}\n`);
+    process.stderr.write(`[shell-session-mcp] Fatal: ${err.message}\n${err.stack}\n`);
     process.exit(1);
   });
 }

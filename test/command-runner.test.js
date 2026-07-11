@@ -117,7 +117,7 @@ test('runCommand can use a custom successExitCode', async () => {
 });
 
 test('runCommand can require a success file pattern', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
 
   try {
     const result = await runCommand({
@@ -148,7 +148,7 @@ test('runCommand can require a success file pattern', async () => {
 });
 
 test('runCommand marks ok=false when success file pattern does not match', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
 
   try {
     const result = await runCommand({
@@ -210,7 +210,7 @@ test('runCommand resolves .cmd wrappers from PATH on Windows', async (t) => {
     return;
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   const originalPath = process.env.PATH;
   const originalPathExt = process.env.PATHEXT;
 
@@ -241,7 +241,7 @@ test('runCommand executes explicit .cmd files on Windows', async (t) => {
     return;
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
 
   try {
     const scriptPath = join(tempDir, 'args-wrapper.cmd');
@@ -262,7 +262,7 @@ test('runCommand executes explicit .cmd files on Windows', async (t) => {
 });
 
 test('runCommand handles explicit command paths with spaces', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart terminal mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'Shell Session mcp-'));
 
   try {
     const isWindows = process.platform === 'win32';
@@ -291,10 +291,10 @@ test('runCommand handles explicit command paths with spaces', async () => {
 test('runCommand adds a helpful ENOENT hint for PATH commands', async () => {
   await assert.rejects(
     runCommand({
-      cmd: '__smart_terminal_missing_command__',
+      cmd: '__shell_session_missing_command__',
       parse: false,
     }),
-    /pass shell:true or start an interactive session with terminal_start/
+    /use shell:true\. Alternatively, start an interactive session with terminal_start/
   );
 });
 

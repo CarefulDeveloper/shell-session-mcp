@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execAndDiff, execWithRetry } from '../src/smart-tools.js';
+import { execAndDiff, execWithRetry } from '../src/session-tools.js';
 
 test('execWithRetry retries until the exit code and pattern succeed', async () => {
   const calls = [];

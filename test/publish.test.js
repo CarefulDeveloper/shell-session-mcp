@@ -26,7 +26,7 @@ test('bumpVersion rejects invalid version formats', () => {
 });
 
 test('revertVersionChanges restores original file contents and removes new files', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   const existingFile = join(tempDir, 'package.json');
   const createdLater = join(tempDir, 'server-card.json');
 
@@ -55,7 +55,7 @@ test('transformHttpScanServerSource rewrites SERVER_CARD using AST and is idempo
     '// Static server card for Smithery scanning',
     'const SERVER_CARD =',
     '  {',
-    "    serverInfo: { name: 'smart-terminal-mcp', version: '1.2.3' },",
+    "    serverInfo: { name: 'shell-session-mcp', version: '1.2.3' },",
     '    tools: [],',
     '  };',
     '',

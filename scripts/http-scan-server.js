@@ -41,7 +41,7 @@ async function closeMcpResources(server, transport) {
 }
 
 function createServer() {
-  const server = new McpServer({ name: 'smart-terminal-mcp', version: SERVER_CARD.serverInfo.version });
+  const server = new McpServer({ name: 'shell-session-mcp', version: SERVER_CARD.serverInfo.version });
   const manager = new SessionManager();
   registerTools(server, manager);
   return server;
@@ -114,7 +114,7 @@ const httpServer = http.createServer(async (req, res) => {
   }
 
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('smart-terminal-mcp HTTP scan server');
+  res.end('shell-session-mcp HTTP scan server');
 });
 
 httpServer.listen(PORT, () => {

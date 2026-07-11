@@ -174,5 +174,5 @@ function formatCwdError(err) {
 }
 
 function log(msg) {
-  process.stderr.write(`[smart-terminal-mcp] ${msg}\n`);
+  process.stderr.write(`[shell-session-mcp] ${msg}\n`);
 }

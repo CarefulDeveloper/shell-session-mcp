@@ -1,16 +1,16 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.pungggi/smart-terminal",
-  "description": "MCP PTY server providing AI agents with real interactive terminal access",
+  "name": "io.github.local/shell-session",
+  "description": "Persistent interactive shell sessions for MCP agents",
   "repository": {
-    "url": "https://github.com/pungggi/smart-terminal-mcp",
+    "url": "https://github.com/your-org/shell-session-mcp",
     "source": "github"
   },
   "version": "1.2.36",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "smart-terminal-mcp",
+      "identifier": "shell-session-mcp",
       "version": "1.2.36",
       "transport": {
         "type": "stdio"

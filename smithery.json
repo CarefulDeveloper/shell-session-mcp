@@ -1,8 +1,8 @@
 {
-  "name": "pungggi/smart-terminal",
-  "description": "MCP PTY server providing AI agents with real interactive terminal access",
+  "name": "local/shell-session",
+  "description": "Persistent interactive shell sessions for MCP agents",
   "version": "1.2.36",
-  "repository": "https://github.com/pungggi/smart-terminal-mcp",
+  "repository": "https://github.com/your-org/shell-session-mcp",
   "tags": [
     "terminal",
     "pty",

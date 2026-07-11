@@ -1,10 +1,12 @@
-# smart-terminal-mcp
-[![Smithery](https://img.shields.io/badge/Smithery-smart--terminal-blue)](https://smithery.ai/server/pungggi/smart-terminal)
-[![Official Registry](https://img.shields.io/badge/MCP-Official--Registry-green)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.pungggi/smart-terminal)
+# shell-session-mcp
+
+Persistent interactive shell sessions for MCP agents.
 
 A PTY-based MCP server with strong Windows support, giving MCP-capable AI clients and their agents persistent, interactive shell access via pseudo-terminals ([node-pty](https://github.com/microsoft/node-pty)).
 
 Unlike simple `exec`-based approaches, this keeps PTY-backed shell sessions alive across steps, with bidirectional communication for interactive CLI tools, incremental reads, and session state that carries forward.
+
+This project is a fork and rename of [pungggi/smart-terminal-mcp](https://github.com/pungggi/smart-terminal-mcp). See [NOTICE](NOTICE) and [LICENSE](LICENSE) for attribution and license details.
 
 See the [Changelog](CHANGELOG.md) for recent updates.
 ## Why use this instead of your AI client's built-in terminal?
@@ -95,17 +97,17 @@ Extra tools are **not hidden** — the agent sees the tool names in the `termina
 - **Discover schemas**: `terminal_extra({ list: true })` → returns full parameter schemas
 - **Call any extra tool**: `terminal_extra({ tool: "terminal_resize", args: { sessionId: "...", cols: 200, rows: 50 } })`
 
-Use `SMART_TERMINAL_DISABLED_TOOLS` to customize which tools are extra, or set it to an empty string to register all 15 tools with full schemas:
+Use `SHELL_SESSION_DISABLED_TOOLS` to customize which tools are extra, or set it to an empty string to register all 15 tools with full schemas. The legacy `SMART_TERMINAL_DISABLED_TOOLS` name is still accepted as a compatibility fallback.
 
 **All tools with full schemas** (no meta-tool):
 
 ```json
 {
   "mcpServers": {
-    "smart-terminal": {
+    "shell-session": {
       "command": "npx",
-      "args": ["-y", "smart-terminal-mcp@stable"],
-      "env": { "SMART_TERMINAL_DISABLED_TOOLS": "" }
+      "args": ["-y", "shell-session-mcp@stable"],
+      "env": { "SHELL_SESSION_DISABLED_TOOLS": "" }
     }
   }
 }
@@ -115,7 +117,7 @@ Use `SMART_TERMINAL_DISABLED_TOOLS` to customize which tools are extra, or set i
 
 ```json
 "env": {
-  "SMART_TERMINAL_DISABLED_TOOLS": "terminal_run,terminal_run_paged,terminal_retry,terminal_diff,terminal_write_file,terminal_resize,terminal_send_key,terminal_get_history,terminal_watch"
+  "SHELL_SESSION_DISABLED_TOOLS": "terminal_run,terminal_run_paged,terminal_retry,terminal_diff,terminal_write_file,terminal_resize,terminal_send_key,terminal_get_history,terminal_watch"
 }
 ```
 
@@ -125,7 +127,7 @@ Use `SMART_TERMINAL_DISABLED_TOOLS` to customize which tools are extra, or set i
 
 ```json
 "env": {
-  "SMART_TERMINAL_DISABLED_TOOLS": "terminal_exec,terminal_diff,terminal_retry,terminal_resize,terminal_send_key,terminal_write,terminal_read,terminal_get_history,terminal_watch"
+  "SHELL_SESSION_DISABLED_TOOLS": "terminal_exec,terminal_diff,terminal_retry,terminal_resize,terminal_send_key,terminal_write,terminal_read,terminal_get_history,terminal_watch"
 }
 ```
 
@@ -136,20 +138,20 @@ Use `SMART_TERMINAL_DISABLED_TOOLS` to customize which tools are extra, or set i
 Recommended: run the stable release directly via `npx`:
 
 ```bash
-npx smart-terminal-mcp@stable
+npx shell-session-mcp@stable
 ```
 
 Or install globally:
 
 ```bash
-npm install -g smart-terminal-mcp
+npm install -g shell-session-mcp
 ```
 
 Or clone for development:
 
 ```bash
 git clone <repo-url>
-cd smart-terminal-mcp
+cd shell-session-mcp
 npm install
 ```
 
@@ -162,9 +164,9 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "smart-terminal": {
+    "shell-session": {
       "command": "npx",
-      "args": ["-y", "smart-terminal-mcp@stable"]
+      "args": ["-y", "shell-session-mcp@stable"]
     }
   }
 }
@@ -173,7 +175,7 @@ Add to your `claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add smart-terminal -- npx -y smart-terminal-mcp@stable
+claude mcp add shell-session -- npx -y shell-session-mcp@stable
 ```
 
 ### Augment Code
@@ -183,10 +185,10 @@ Add to your Augment MCP settings:
 ```json
 {
   "mcpServers": {
-    "Smart Terminal": {
+    "Shell Session": {
       "command": "npx",
       "args": [
-        "smart-terminal-mcp@stable"
+        "shell-session-mcp@stable"
       ]
     }
   }
@@ -566,7 +568,7 @@ src/
   command-parsers.js  Structured parsers for supported read-only commands
   pager.js            Line-based pagination helper for large stdout
   pty-session.js      PTY session: marker injection, idle read, buffer mgmt
-  smart-tools.js      Retry and diff helpers for higher-level terminal tools
+  session-tools.js      Retry and diff helpers for higher-level terminal tools
   regex-utils.js      Shared user-regex validation and compilation
   session-id.js       Human-readable session ID generation
   session-manager.js  Session lifecycle, TTL cleanup, concurrency limits
@@ -612,4 +614,4 @@ When parsing was requested but no parser matched, `terminal_run` may include a s
 
 ## License
 
-MIT
+MIT. This fork preserves the upstream MIT license and attribution; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

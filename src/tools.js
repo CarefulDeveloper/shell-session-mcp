@@ -6,7 +6,7 @@ import { DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_TIMEOUT_MS, runCommand } from './comm
 import { normalizeCommandName, summarizeCommandOutput } from './command-parsers.js';
 import { DEFAULT_PAGE_SIZE, paginateOutput } from './pager.js';
 import { DEFAULT_EXEC_MAX_LINES, DEFAULT_HISTORY_FORMAT, DEFAULT_HISTORY_LIMIT, DEFAULT_READ_MAX_LINES } from './pty-session.js';
-import { execAndDiff, execWithRetry } from './smart-tools.js';
+import { execAndDiff, execWithRetry } from './session-tools.js';
 
 const FS_ERROR_MESSAGES = {
   EACCES: 'Permission denied',
@@ -74,8 +74,9 @@ function assertReadTimeouts(timeout, idleTimeout) {
  */
 export function registerTools(server, manager) {
   const DEFAULT_EXTRA = 'terminal_run_paged,terminal_retry,terminal_diff,terminal_resize,terminal_send_key,terminal_get_history,terminal_write_file,terminal_watch';
+  const disabledTools = process.env.SHELL_SESSION_DISABLED_TOOLS ?? process.env.SMART_TERMINAL_DISABLED_TOOLS ?? DEFAULT_EXTRA;
   const _off = new Set(
-    (process.env.SMART_TERMINAL_DISABLED_TOOLS ?? DEFAULT_EXTRA).split(',').map(s => s.trim()).filter(Boolean)
+    disabledTools.split(',').map(s => s.trim()).filter(Boolean)
   );
   const _extras = new Map();
   const tool = (name, desc, schema, handler) => {

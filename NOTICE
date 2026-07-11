@@ -1,0 +1,11 @@
+shell-session-mcp
+
+This project is a fork and rename of smart-terminal-mcp:
+https://github.com/pungggi/smart-terminal-mcp
+
+The original project is licensed under the MIT License.
+Original author information from the upstream Git history:
+ngSoftware <alessandro@pungitore.ch>
+
+Local changes include renaming the package, MCP server identity, CLI binary,
+metadata, and documentation from smart-terminal-mcp to shell-session-mcp.

@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **`terminal_extra` meta-tool**: Convenience tools (`terminal_run_paged`, `terminal_retry`, `terminal_diff`, `terminal_resize`, `terminal_send_key`, `terminal_get_history`, `terminal_write_file`) are now collected behind a single lightweight meta-tool by default, reducing tool definition token overhead by ~50%. The agent can discover schemas via `list: true` and call any extra tool through `terminal_extra`.
-- **`SMART_TERMINAL_DISABLED_TOOLS` env var**: Customize which tools are moved behind `terminal_extra`. Set to empty string to register all 15 tools with full schemas.
+- **`SHELL_SESSION_DISABLED_TOOLS` env var**: Customize which tools are moved behind `terminal_extra`. Set to empty string to register all 15 tools with full schemas.
 
 ### Changed
 - Stripped redundant `.describe()` calls from tool parameter schemas where the parameter name is self-documenting (e.g. `sessionId`, `command`, `cwd`, `timeout`). Keeps only 6 essential descriptions for non-obvious parameters.

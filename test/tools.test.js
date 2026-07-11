@@ -65,7 +65,7 @@ test('tools source does not pretty-print JSON responses', async () => {
 });
 
 test('tool metadata stays concise', () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
     const server = createFakeServer();
     registerTools(server, {});
@@ -79,12 +79,12 @@ test('tool metadata stays concise', () => {
       }
     }
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
 test('tool schemas keep agent-friendly default output sizes', () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
   const server = createFakeServer();
   registerTools(server, {});
@@ -112,7 +112,7 @@ test('tool schemas keep agent-friendly default output sizes', () => {
     terminalListVerbose: true,
   });
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
@@ -177,8 +177,8 @@ test('terminal_start stops a created session when banner startup fails', async (
   assert.deepEqual(stopCalls, ['s1']);
 });
 
-test('SMART_TERMINAL_DISABLED_TOOLS moves tools behind terminal_extra', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = 'terminal_diff, terminal_retry';
+test('SHELL_SESSION_DISABLED_TOOLS moves tools behind terminal_extra', async () => {
+  process.env.SHELL_SESSION_DISABLED_TOOLS = 'terminal_diff, terminal_retry';
   try {
     const server = createFakeServer();
     registerTools(server, {});
@@ -205,11 +205,25 @@ test('SMART_TERMINAL_DISABLED_TOOLS moves tools behind terminal_extra', async ()
     const valResult = await server.tools.get('terminal_extra').handler({ tool: 'terminal_diff', args: { timeout: 'not-a-number' } });
     assert.ok(valResult.isError, 'bad args should return isError');
   } finally {
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
+  }
+});
+
+test('SMART_TERMINAL_DISABLED_TOOLS remains a compatibility fallback', () => {
+  delete process.env.SHELL_SESSION_DISABLED_TOOLS;
+  process.env.SMART_TERMINAL_DISABLED_TOOLS = 'terminal_diff';
+  try {
+    const server = createFakeServer();
+    registerTools(server, {});
+    assert.ok(!server.tools.has('terminal_diff'), 'terminal_diff should honor legacy env var');
+    assert.ok(server.tools.has('terminal_extra'), 'terminal_extra should be present');
+  } finally {
     delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
   }
 });
 
 test('default: convenience tools behind terminal_extra', () => {
+  delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
   const server = createFakeServer();
   registerTools(server, {});
@@ -229,8 +243,8 @@ test('default: convenience tools behind terminal_extra', () => {
   assert.ok(!server.tools.has('terminal_resize'), 'terminal_resize is extra by default');
 });
 
-test('SMART_TERMINAL_DISABLED_TOOLS="" registers all tools normally', () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+test('SHELL_SESSION_DISABLED_TOOLS="" registers all tools normally', () => {
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
     const server = createFakeServer();
     registerTools(server, {});
@@ -238,7 +252,7 @@ test('SMART_TERMINAL_DISABLED_TOOLS="" registers all tools normally', () => {
     assert.ok(server.tools.has('terminal_diff'), 'terminal_diff registered normally');
     assert.ok(server.tools.has('terminal_retry'), 'terminal_retry registered normally');
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
@@ -266,7 +280,7 @@ test('terminal_run can re-evaluate success from a file pattern', async () => {
 
   registerTools(server, {});
 
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     const result = await server.tools.get('terminal_run').handler({
       cmd: process.execPath,
@@ -310,11 +324,11 @@ test('terminal_run ENOENT error hints at shell=true and terminal_start', async (
 
   await assert.rejects(
     () => server.tools.get('terminal_run').handler({
-      cmd: 'smart-terminal-missing-binary-xyz',
+      cmd: 'shell-session-missing-binary-xyz',
       args: [],
       parse: false,
     }),
-    /pass shell:true or start an interactive session with terminal_start/
+    /use shell:true\. Alternatively, start an interactive session with terminal_start/
   );
 });
 
@@ -342,7 +356,7 @@ test('terminal_read rejects idleTimeout values that are not less than timeout', 
 });
 
 test('terminal_run_paged can return summaries for read-only commands', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
     const server = createFakeServer();
     const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
@@ -363,12 +377,12 @@ test('terminal_run_paged can return summaries for read-only commands', async () 
     assert.ok(payload.stdout.summary.pathCount > 0);
     assert.ok(payload.pageInfo.totalLines > 0);
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
 test('terminal_get_history forwards format and returns text payloads', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
     const server = createFakeServer();
     const historyCalls = [];
@@ -399,7 +413,7 @@ test('terminal_get_history forwards format and returns text payloads', async () 
       returnedTo: 3,
     });
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
@@ -448,7 +462,7 @@ test('terminal_wait forwards returnMode and tailLines', async () => {
 });
 
 test('terminal_retry returns retry results as compact JSON', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
   const server = createFakeServer();
   let calls = 0;
@@ -484,12 +498,12 @@ test('terminal_retry returns retry results as compact JSON', async () => {
     history: [{ attempt: 1, output: 'ok', exitCode: 0, cwd: 'C:/repo', timedOut: false }],
   });
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
 test('terminal_diff returns diff results as compact JSON', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
   const server = createFakeServer();
   const execCalls = [];
@@ -524,7 +538,7 @@ test('terminal_diff returns diff results as compact JSON', async () => {
   assert.match(payload.diff, /--- type before.txt/);
   assert.match(payload.diff, /\+\+\+ type after.txt/);
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });
 
@@ -616,7 +630,7 @@ test('terminal_stop returns snapshot when snapshotLines > 0', async () => {
 
 test('terminal_stop writes transcript to disk', async () => {
   const server = createFakeServer();
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     const transcriptPath = join(tempDir, 'output.log');
     const manager = {
@@ -694,7 +708,7 @@ test('terminal_stop preserves original behavior with no options', async () => {
 });
 
 test('terminal_watch forwards triggers and options', async () => {
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = '';
+  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
   try {
     const server = createFakeServer();
     const watchCalls = [];
@@ -728,6 +742,6 @@ test('terminal_watch forwards triggers and options', async () => {
     assert.equal(payload.reason, 'trigger');
     assert.equal(payload.triggerId, 'ready');
   } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
+    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
   }
 });

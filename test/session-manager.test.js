@@ -6,7 +6,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { SessionManager, resolveSessionCwd } from '../src/session-manager.js';
 
 test('resolveSessionCwd returns an absolute directory path', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
 
   try {
     const resolved = await resolveSessionCwd(tempDir);
@@ -25,7 +25,7 @@ test('SessionManager.create rejects invalid cwd before creating a session', asyn
   }
 
   const manager = new SessionManager({ SessionClass: FakeSession });
-  const missingDir = join(tmpdir(), `smart-terminal-mcp-missing-${Date.now()}`);
+  const missingDir = join(tmpdir(), `shell-session-mcp-missing-${Date.now()}`);
 
   try {
     await assert.rejects(
@@ -68,7 +68,7 @@ test('SessionManager.create rejects unknown shell before creating a session', as
 });
 
 test('SessionManager.create rejects file cwd values', async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), 'smart-terminal-mcp-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   const filePath = join(tempDir, 'not-a-directory.txt');
   await writeFile(filePath, 'hello');
 
