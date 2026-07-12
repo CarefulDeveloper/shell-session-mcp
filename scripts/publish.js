@@ -498,7 +498,7 @@ async function publishToSmithery() {
     const apiKey = process.env.SMITHERY_API_KEY || '';
     const envVars = apiKey ? { SMITHERY_API_KEY: apiKey } : {};
     runCommand(
-      `npx smithery mcp publish "${tunnelUrl}/mcp" -n local/shell-session`,
+      `npx smithery mcp publish "${tunnelUrl}/mcp" -n carefuldeveloper/shell-session`,
       'Smithery.ai publishing failed.',
       envVars,
     );

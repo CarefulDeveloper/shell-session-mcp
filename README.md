@@ -150,7 +150,7 @@ npm install -g @pkgpub/shell-session-mcp
 Or clone for development:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/CarefulDeveloper/shell-session-mcp.git
 cd shell-session-mcp
 npm install
 ```

@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.local/shell-session",
+  "name": "io.github.carefuldeveloper/shell-session",
   "description": "Persistent interactive shell sessions for MCP agents",
   "repository": {
-    "url": "https://github.com/your-org/shell-session-mcp",
+    "url": "https://github.com/CarefulDeveloper/shell-session-mcp",
     "source": "github"
   },
   "version": "1.2.37",
