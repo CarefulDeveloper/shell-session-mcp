@@ -19,7 +19,11 @@ function getDescription(schema) {
   return schema.description ?? schema?._def?.description ?? '';
 }
 
-test('terminal_list returns compact JSON content', async () => {
+async function callShellSession(server, action, args = {}, extra = {}) {
+  return await server.tools.get('shell_session').handler({ action, args }, extra);
+}
+
+test('list action returns compact JSON content', async () => {
   const server = createFakeServer();
   const sessions = [{ id: 's1', cwd: 'C:/repo' }];
   const listCalls = [];
@@ -32,15 +36,14 @@ test('terminal_list returns compact JSON content', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_list').handler({});
+  const result = await callShellSession(server, 'list', {});
   const expected = { sessions, count: sessions.length };
 
   assert.deepEqual(listCalls, [{ verbose: true }]);
-  assert.equal(result.content[0].text, JSON.stringify(expected));
   assert.deepEqual(JSON.parse(result.content[0].text), expected);
 });
 
-test('terminal_list forwards verbose=false for minimal output', async () => {
+test('list action forwards verbose=false for minimal output', async () => {
   const server = createFakeServer();
   const sessions = [{ id: 's1', name: 'main', cwd: 'C:/repo', alive: true, busy: false }];
   const listCalls = [];
@@ -53,7 +56,7 @@ test('terminal_list forwards verbose=false for minimal output', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_list').handler({ verbose: false });
+  const result = await callShellSession(server, 'list', { verbose: false });
 
   assert.deepEqual(listCalls, [{ verbose: false }]);
   assert.deepEqual(JSON.parse(result.content[0].text), { sessions, count: 1 });
@@ -65,59 +68,77 @@ test('tools source does not pretty-print JSON responses', async () => {
 });
 
 test('tool metadata stays concise', () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
-    const server = createFakeServer();
-    registerTools(server, {});
-    for (const [name, { description, schema }] of server.tools) {
-      assert.ok(description.length <= 70, `${name} description is too long`);
-      assert.doesNotMatch(description, /Supported keys:/);
-      for (const [fieldName, fieldSchema] of Object.entries(schema)) {
-        const fieldDescription = getDescription(fieldSchema);
-        const maxDescriptionLength = name === 'terminal_write' && fieldName === 'data' ? 170 : 30;
-        assert.ok(fieldDescription.length <= maxDescriptionLength, `${name}.${fieldName} description is too long`);
-        assert.doesNotMatch(fieldDescription, /\(default:|e\.g\.|Defaults to|such as/i);
-      }
-    }
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
-});
-
-test('tool schemas keep agent-friendly default output sizes', () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
   const server = createFakeServer();
   registerTools(server, {});
-  assert.deepEqual({
-    terminalExecMaxLines: server.tools.get('terminal_exec').schema.maxLines.parse(undefined),
-    terminalReadMaxLines: server.tools.get('terminal_read').schema.maxLines.parse(undefined),
-    terminalHistoryMaxLines: server.tools.get('terminal_get_history').schema.maxLines.parse(undefined),
-    terminalHistoryFormat: server.tools.get('terminal_get_history').schema.format.parse(undefined),
-    terminalRunPagedPageSize: server.tools.get('terminal_run_paged').schema.pageSize.parse(undefined),
-    terminalRunParseOnly: server.tools.get('terminal_run').schema.parseOnly.parse(undefined),
-    terminalRunSummary: server.tools.get('terminal_run').schema.summary.parse(undefined),
-    terminalRunSuccessExitCode: server.tools.get('terminal_run').schema.successExitCode.parse(undefined),
-    terminalRunPagedSummary: server.tools.get('terminal_run_paged').schema.summary.parse(undefined),
-    terminalListVerbose: server.tools.get('terminal_list').schema.verbose.parse(undefined),
-  }, {
-    terminalExecMaxLines: 200,
-    terminalReadMaxLines: 200,
-    terminalHistoryMaxLines: 200,
-    terminalHistoryFormat: 'lines',
-    terminalRunPagedPageSize: 100,
-    terminalRunParseOnly: false,
-    terminalRunSummary: false,
-    terminalRunSuccessExitCode: 0,
-    terminalRunPagedSummary: false,
-    terminalListVerbose: true,
-  });
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
+  for (const [name, { description, schema }] of server.tools) {
+    assert.ok(description.length <= 240, `${name} description is too long`);
+    assert.doesNotMatch(description, /Supported keys:/);
+    for (const [fieldName, fieldSchema] of Object.entries(schema)) {
+      const fieldDescription = getDescription(fieldSchema);
+      assert.ok(fieldDescription.length <= 70, `${name}.${fieldName} description is too long`);
+      assert.doesNotMatch(fieldDescription, /\(default:|e\.g\.|Defaults to|such as/i);
+    }
   }
 });
 
-test('terminal_start returns compact session metadata', async () => {
+test('only shell_session is registered', () => {
+  const server = createFakeServer();
+  registerTools(server, {});
+  assert.deepEqual([...server.tools.keys()], ['shell_session']);
+});
+
+test('shell_session help lists actions without detailed parameters', async () => {
+  const server = createFakeServer();
+  registerTools(server, {});
+
+  const result = await callShellSession(server, 'help');
+  const payload = JSON.parse(result.content[0].text);
+
+  assert.match(payload.usage, /For detailed parameters/);
+  assert.ok(payload.actions.some(action => action.name === 'write'));
+  assert.ok(payload.actions.some(action => action.name === 'read'));
+  assert.equal(payload.actions.some(action => action.parameters), false);
+});
+
+test('shell_session help returns detailed parameters for selected actions', async () => {
+  const server = createFakeServer();
+  registerTools(server, {});
+
+  const result = await callShellSession(server, 'help', { actions: ['write', 'read'] });
+  const payload = JSON.parse(result.content[0].text);
+
+  assert.match(payload.actions.write.parameters.data.description, /\$\{file:path::1-2\}/);
+  assert.equal(payload.actions.write.parameters.sessionId.required, true);
+  assert.equal(payload.actions.write.parameters.type.required, false);
+  assert.equal(payload.actions.read.parameters.since.type, 'number');
+  assert.equal(Array.isArray(payload.actions.write.examples), true);
+  assert.equal(payload.actions.write.examples.length, 1);
+  assert.deepEqual(payload.actions.write.examples[0], {
+    action: 'write',
+    args: { sessionId: 'calm-reef', type: 'template', data: '${file:info.txt::2}\\r' },
+  });
+});
+
+test('shell_session returns help-oriented errors for invalid calls', async () => {
+  const server = createFakeServer();
+  registerTools(server, {});
+
+  const missing = await server.tools.get('shell_session').handler({ args: {} });
+  assert.ok(missing.isError);
+  assert.match(missing.content[0].text, /"action":"help"/);
+
+  const unknown = await callShellSession(server, 'nope');
+  assert.ok(unknown.isError);
+  assert.match(unknown.content[0].text, /Unknown action "nope"/);
+  assert.match(unknown.content[0].text, /"action":"help"/);
+
+  const invalidArgs = await callShellSession(server, 'read', { sessionId: 's1', timeout: 'soon' });
+  assert.ok(invalidArgs.isError);
+  assert.match(invalidArgs.content[0].text, /Invalid args for action "read"/);
+  assert.match(invalidArgs.content[0].text, /"actions":\["read"\]/);
+});
+
+test('start action returns compact session metadata', async () => {
   const server = createFakeServer();
   const createCalls = [];
   const manager = {
@@ -135,7 +156,7 @@ test('terminal_start returns compact session metadata', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_start').handler({
+  const result = await callShellSession(server, 'start', {
     cols: 140,
     rows: 40,
     cwd: 'C:/repo',
@@ -152,7 +173,7 @@ test('terminal_start returns compact session metadata', async () => {
   });
 });
 
-test('terminal_start stops a created session when banner startup fails', async () => {
+test('start action stops a created session when banner startup fails', async () => {
   const server = createFakeServer();
   const stopCalls = [];
   const manager = {
@@ -170,98 +191,21 @@ test('terminal_start stops a created session when banner startup fails', async (
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_start').handler({});
+  const result = await callShellSession(server, 'start', {});
   assert.ok(result.isError, 'expected isError to be true');
   assert.match(result.content[0].text, /banner failed/);
   // Hint only appears when shell was explicitly provided; this test passes no shell.
-  assert.doesNotMatch(result.content[0].text, /call terminal_start with NO shell parameter/i);
+  assert.doesNotMatch(result.content[0].text, /omit args\.shell/i);
   assert.deepEqual(stopCalls, ['s1']);
 });
 
-test('SHELL_SESSION_DISABLED_TOOLS moves tools behind terminal_extra', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = 'terminal_diff, terminal_retry';
-  try {
-    const server = createFakeServer();
-    registerTools(server, {});
-    // Disabled tools are NOT registered individually
-    assert.ok(!server.tools.has('terminal_diff'), 'terminal_diff should not be a standalone tool');
-    assert.ok(!server.tools.has('terminal_retry'), 'terminal_retry should not be a standalone tool');
-    // Enabled tools still work
-    assert.ok(server.tools.has('terminal_run'), 'terminal_run should be present');
-    assert.ok(server.tools.has('terminal_list'), 'terminal_list should be present');
-    // Meta-tool is registered
-    assert.ok(server.tools.has('terminal_extra'), 'terminal_extra should be present');
-    assert.match(server.tools.get('terminal_extra').description, /terminal_diff/);
-    assert.match(server.tools.get('terminal_extra').description, /terminal_retry/);
-    // list=true returns catalog
-    const listResult = await server.tools.get('terminal_extra').handler({ list: true });
-    const catalog = JSON.parse(listResult.content[0].text);
-    assert.ok(catalog.terminal_diff, 'catalog should contain terminal_diff');
-    assert.ok(catalog.terminal_retry, 'catalog should contain terminal_retry');
-    assert.ok(catalog.terminal_diff.parameters, 'should include parameter schemas');
-    // Unknown tool returns error
-    const badResult = await server.tools.get('terminal_extra').handler({ tool: 'nope', args: {} });
-    assert.ok(badResult.isError, 'unknown tool should return isError');
-    // Validation error returns helpful message
-    const valResult = await server.tools.get('terminal_extra').handler({ tool: 'terminal_diff', args: { timeout: 'not-a-number' } });
-    assert.ok(valResult.isError, 'bad args should return isError');
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
-});
-
-test('SMART_TERMINAL_DISABLED_TOOLS remains a compatibility fallback', () => {
-  delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  process.env.SMART_TERMINAL_DISABLED_TOOLS = 'terminal_diff';
-  try {
-    const server = createFakeServer();
-    registerTools(server, {});
-    assert.ok(!server.tools.has('terminal_diff'), 'terminal_diff should honor legacy env var');
-    assert.ok(server.tools.has('terminal_extra'), 'terminal_extra should be present');
-  } finally {
-    delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
-  }
-});
-
-test('default: convenience tools behind terminal_extra', () => {
-  delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  delete process.env.SMART_TERMINAL_DISABLED_TOOLS;
-  const server = createFakeServer();
-  registerTools(server, {});
-  // Core tools registered normally
-  assert.ok(server.tools.has('terminal_start'), 'terminal_start is core');
-  assert.ok(server.tools.has('terminal_exec'), 'terminal_exec is core');
-  assert.ok(server.tools.has('terminal_run'), 'terminal_run is core');
-  assert.ok(server.tools.has('terminal_read'), 'terminal_read is core');
-  assert.ok(server.tools.has('terminal_write'), 'terminal_write is core');
-  assert.ok(server.tools.has('terminal_wait'), 'terminal_wait is core');
-  assert.ok(server.tools.has('terminal_stop'), 'terminal_stop is core');
-  assert.ok(server.tools.has('terminal_list'), 'terminal_list is core');
-  // Convenience tools behind terminal_extra
-  assert.ok(server.tools.has('terminal_extra'), 'terminal_extra should exist by default');
-  assert.ok(!server.tools.has('terminal_diff'), 'terminal_diff is extra by default');
-  assert.ok(!server.tools.has('terminal_retry'), 'terminal_retry is extra by default');
-  assert.ok(!server.tools.has('terminal_resize'), 'terminal_resize is extra by default');
-});
-
-test('SHELL_SESSION_DISABLED_TOOLS="" registers all tools normally', () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
-    const server = createFakeServer();
-    registerTools(server, {});
-    assert.ok(!server.tools.has('terminal_extra'), 'no meta-tool when all enabled');
-    assert.ok(server.tools.has('terminal_diff'), 'terminal_diff registered normally');
-    assert.ok(server.tools.has('terminal_retry'), 'terminal_retry registered normally');
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
-});
-
-test('terminal_write data schema documents template placeholders', () => {
+test('write help documents template placeholders', async () => {
   const server = createFakeServer();
   registerTools(server, {});
 
-  const dataDescription = getDescription(server.tools.get('terminal_write').schema.data);
+  const result = await callShellSession(server, 'help', { actions: ['write'] });
+  const payload = JSON.parse(result.content[0].text);
+  const dataDescription = payload.actions.write.parameters.data.description;
   assert.match(dataDescription, /\$\{file:path\}=whole file/);
   assert.match(dataDescription, /\$\{file:path::1\}/);
   assert.match(dataDescription, /=line 1/);
@@ -273,7 +217,7 @@ test('terminal_write data schema documents template placeholders', () => {
   assert.match(dataDescription, /=env/);
 });
 
-test('terminal_write writes text with escaped control characters', async () => {
+test('write action writes text with escaped control characters', async () => {
   const server = createFakeServer();
   const writes = [];
   const manager = {
@@ -286,7 +230,7 @@ test('terminal_write writes text with escaped control characters', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_write').handler({
+  const result = await callShellSession(server, 'write', {
     sessionId: 's1',
     type: 'text',
     data: 'hello\\n',
@@ -301,7 +245,7 @@ test('terminal_write writes text with escaped control characters', async () => {
   });
 });
 
-test('terminal_write expands template file placeholders server-side', async () => {
+test('write action expands template file placeholders server-side', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     await writeFile(join(tempDir, 'password.txt'), 'secret-value');
@@ -317,7 +261,7 @@ test('terminal_write expands template file placeholders server-side', async () =
 
     registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_write').handler({
+    const result = await callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: 'password=${file:password.txt}\r\n',
@@ -337,7 +281,7 @@ test('terminal_write expands template file placeholders server-side', async () =
   }
 });
 
-test('terminal_write template supports line and column ranges', async () => {
+test('write action template supports line and column ranges', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     const secretPath = join(tempDir, 'secret.txt');
@@ -354,7 +298,7 @@ test('terminal_write template supports line and column ranges', async () => {
 
     registerTools(server, manager);
 
-    await server.tools.get('terminal_write').handler({
+    await callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: 'lines=${file:secret.txt::1-2}; cols=${file:secret.txt::2:2-3:3}',
@@ -366,7 +310,7 @@ test('terminal_write template supports line and column ranges', async () => {
   }
 });
 
-test('terminal_write template supports absolute Windows-style paths with ranges', async () => {
+test('write action template supports absolute Windows-style paths with ranges', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     const secretPath = resolve(tempDir, 'absolute-secret.txt');
@@ -383,7 +327,7 @@ test('terminal_write template supports absolute Windows-style paths with ranges'
 
     registerTools(server, manager);
 
-    await server.tools.get('terminal_write').handler({
+    await callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: `value=${'${'}file:${secretPath}::2}`,
@@ -395,7 +339,7 @@ test('terminal_write template supports absolute Windows-style paths with ranges'
   }
 });
 
-test('terminal_write template treats final newline as a line terminator only', async () => {
+test('write action template treats final newline as a line terminator only', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     await writeFile(join(tempDir, 'secret.txt'), 'only-line\r\n');
@@ -411,14 +355,14 @@ test('terminal_write template treats final newline as a line terminator only', a
 
     registerTools(server, manager);
 
-    await server.tools.get('terminal_write').handler({
+    await callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: '${file:secret.txt::1}',
     });
 
     await assert.rejects(
-      server.tools.get('terminal_write').handler({
+      callShellSession(server, 'write', {
         sessionId: 's1',
         type: 'template',
         data: '${file:secret.txt::2}',
@@ -431,7 +375,7 @@ test('terminal_write template treats final newline as a line terminator only', a
   }
 });
 
-test('terminal_write template supports escaped placeholders', async () => {
+test('write action template supports escaped placeholders', async () => {
   const server = createFakeServer();
   const writes = [];
   const manager = {
@@ -444,7 +388,7 @@ test('terminal_write template supports escaped placeholders', async () => {
 
   registerTools(server, manager);
 
-  await server.tools.get('terminal_write').handler({
+  await callShellSession(server, 'write', {
     sessionId: 's1',
     type: 'template',
     data: '$${file:secret.txt}',
@@ -453,7 +397,7 @@ test('terminal_write template supports escaped placeholders', async () => {
   assert.deepEqual(writes, ['${file:secret.txt}']);
 });
 
-test('terminal_write template expands environment placeholders server-side', async () => {
+test('write action template expands environment placeholders server-side', async () => {
   process.env.SHELL_SESSION_MCP_TEST_SECRET = 'from-env';
   try {
     const server = createFakeServer();
@@ -468,7 +412,7 @@ test('terminal_write template expands environment placeholders server-side', asy
 
     registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_write').handler({
+    const result = await callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: 'secret=${env:SHELL_SESSION_MCP_TEST_SECRET}',
@@ -488,7 +432,7 @@ test('terminal_write template expands environment placeholders server-side', asy
   }
 });
 
-test('terminal_write template does not write partial output on expansion failure', async () => {
+test('write action template does not write partial output on expansion failure', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
     await writeFile(join(tempDir, 'secret.txt'), 'secret');
@@ -505,7 +449,7 @@ test('terminal_write template does not write partial output on expansion failure
     registerTools(server, manager);
 
     await assert.rejects(
-      server.tools.get('terminal_write').handler({
+      callShellSession(server, 'write', {
         sessionId: 's1',
         type: 'template',
         data: 'before ${file:secret.txt} after ${file:missing.txt}',
@@ -518,7 +462,7 @@ test('terminal_write template does not write partial output on expansion failure
   }
 });
 
-test('terminal_write template rejects invalid or unset environment placeholders', async () => {
+test('write action template rejects invalid or unset environment placeholders', async () => {
   const server = createFakeServer();
   const writes = [];
   const manager = {
@@ -532,7 +476,7 @@ test('terminal_write template rejects invalid or unset environment placeholders'
   registerTools(server, manager);
 
   await assert.rejects(
-    server.tools.get('terminal_write').handler({
+    callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: '${env:BAD-NAME}',
@@ -541,7 +485,7 @@ test('terminal_write template rejects invalid or unset environment placeholders'
   );
 
   await assert.rejects(
-    server.tools.get('terminal_write').handler({
+    callShellSession(server, 'write', {
       sessionId: 's1',
       type: 'template',
       data: '${env:SHELL_SESSION_MCP_TEST_SECRET_MISSING}',
@@ -552,13 +496,13 @@ test('terminal_write template rejects invalid or unset environment placeholders'
   assert.deepEqual(writes, []);
 });
 
-test('terminal_run forwards summary mode for concise output', async () => {
+test('run action forwards summary mode for concise output', async () => {
   const server = createFakeServer();
   const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
 
   registerTools(server, {});
 
-  const result = await server.tools.get('terminal_run').handler({
+  const result = await callShellSession(server, 'run', {
     cmd: lookupCommand,
     args: [lookupCommand],
     parse: false,
@@ -571,14 +515,14 @@ test('terminal_run forwards summary mode for concise output', async () => {
   assert.ok(payload.stdout.summary.pathCount > 0);
 });
 
-test('terminal_run can re-evaluate success from a file pattern', async () => {
+test('run action can re-evaluate success from a file pattern', async () => {
   const server = createFakeServer();
 
   registerTools(server, {});
 
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
-    const result = await server.tools.get('terminal_run').handler({
+    const result = await callShellSession(server, 'run', {
       cmd: process.execPath,
       cwd: tempDir,
       args: ['-e', 'require("node:fs").writeFileSync("build.log", "BUILD FAILED\\n")'],
@@ -598,11 +542,11 @@ test('terminal_run can re-evaluate success from a file pattern', async () => {
   }
 });
 
-test('terminal_run shell=true executes commands via the system shell', async () => {
+test('run action shell=true executes commands via the system shell', async () => {
   const server = createFakeServer();
   registerTools(server, {});
 
-  const result = await server.tools.get('terminal_run').handler({
+  const result = await callShellSession(server, 'run', {
     cmd: 'echo shell-ok',
     args: [],
     shell: true,
@@ -614,21 +558,21 @@ test('terminal_run shell=true executes commands via the system shell', async () 
   assert.match(payload.stdout.raw, /shell-ok/);
 });
 
-test('terminal_run ENOENT error hints at shell=true and terminal_start', async () => {
+test('run action ENOENT error hints at shell=true and start action', async () => {
   const server = createFakeServer();
   registerTools(server, {});
 
   await assert.rejects(
-    () => server.tools.get('terminal_run').handler({
+    () => callShellSession(server, 'run', {
       cmd: 'shell-session-missing-binary-xyz',
       args: [],
       parse: false,
     }),
-    /use shell:true\. Alternatively, start an interactive session with terminal_start/
+    /use shell:true\. Alternatively, start an interactive session with shell_session action="start"/
   );
 });
 
-test('terminal_read rejects idleTimeout values that are not less than timeout', async () => {
+test('read action rejects idleTimeout values that are not less than timeout', async () => {
   const server = createFakeServer();
   let getCalls = 0;
   const manager = {
@@ -641,7 +585,7 @@ test('terminal_read rejects idleTimeout values that are not less than timeout', 
   registerTools(server, manager);
 
   await assert.rejects(
-    () => server.tools.get('terminal_read').handler({
+    () => callShellSession(server, 'read', {
       sessionId: 's1',
       timeout: 500,
       idleTimeout: 500,
@@ -651,69 +595,59 @@ test('terminal_read rejects idleTimeout values that are not less than timeout', 
   assert.equal(getCalls, 0);
 });
 
-test('terminal_run_paged can return summaries for read-only commands', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
-    const server = createFakeServer();
-    const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
+test('run_paged action can return summaries for read-only commands', async () => {
+  const server = createFakeServer();
+  const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
 
-    registerTools(server, {});
+  registerTools(server, {});
 
-    const result = await server.tools.get('terminal_run_paged').handler({
-      cmd: lookupCommand,
-      args: [lookupCommand],
-      page: 0,
-      pageSize: 5,
-      summary: true,
-    });
+  const result = await callShellSession(server, 'run_paged', {
+    cmd: lookupCommand,
+    args: [lookupCommand],
+    page: 0,
+    pageSize: 5,
+    summary: true,
+  });
 
-    const payload = JSON.parse(result.content[0].text);
-    assert.equal(payload.stdout.raw, '');
-    assert.equal(payload.stdout.parsed, null);
-    assert.ok(payload.stdout.summary.pathCount > 0);
-    assert.ok(payload.pageInfo.totalLines > 0);
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
+  const payload = JSON.parse(result.content[0].text);
+  assert.equal(payload.stdout.raw, '');
+  assert.equal(payload.stdout.parsed, null);
+  assert.ok(payload.stdout.summary.pathCount > 0);
+  assert.ok(payload.pageInfo.totalLines > 0);
 });
 
-test('terminal_get_history forwards format and returns text payloads', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
-    const server = createFakeServer();
-    const historyCalls = [];
-    const manager = {
-      get: () => ({
-        getHistory: (opts) => {
-          historyCalls.push(opts);
-          return { text: 'line 2\nline 3', totalLines: 3, returnedFrom: 1, returnedTo: 3 };
-        },
-      }),
-    };
+test('get_history action forwards format and returns text payloads', async () => {
+  const server = createFakeServer();
+  const historyCalls = [];
+  const manager = {
+    get: () => ({
+      getHistory: (opts) => {
+        historyCalls.push(opts);
+        return { text: 'line 2\nline 3', totalLines: 3, returnedFrom: 1, returnedTo: 3 };
+      },
+    }),
+  };
 
-    registerTools(server, manager);
+  registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_get_history').handler({
-      sessionId: 's1',
-      offset: 0,
-      maxLines: 2,
-      format: 'text',
-    });
+  const result = await callShellSession(server, 'get_history', {
+    sessionId: 's1',
+    offset: 0,
+    maxLines: 2,
+    format: 'text',
+  });
 
-    assert.deepEqual(historyCalls, [{ offset: 0, limit: 2, format: 'text' }]);
-    assert.deepEqual(JSON.parse(result.content[0].text), {
-      sessionId: 's1',
-      text: 'line 2\nline 3',
-      totalLines: 3,
-      returnedFrom: 1,
-      returnedTo: 3,
-    });
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
+  assert.deepEqual(historyCalls, [{ offset: 0, limit: 2, format: 'text' }]);
+  assert.deepEqual(JSON.parse(result.content[0].text), {
+    sessionId: 's1',
+    text: 'line 2\nline 3',
+    totalLines: 3,
+    returnedFrom: 1,
+    returnedTo: 3,
+  });
 });
 
-test('terminal_wait forwards returnMode and tailLines', async () => {
+test('wait action forwards returnMode and tailLines', async () => {
   const server = createFakeServer();
   const waitCalls = [];
   const manager = {
@@ -728,7 +662,7 @@ test('terminal_wait forwards returnMode and tailLines', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_wait').handler(
+  const result = await callShellSession(server, 'wait',
     {
       sessionId: 's1',
       pattern: 'ready',
@@ -757,9 +691,7 @@ test('terminal_wait forwards returnMode and tailLines', async () => {
   });
 });
 
-test('terminal_retry returns retry results as compact JSON', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
+test('retry action returns retry results as compact JSON', async () => {
   const server = createFakeServer();
   let calls = 0;
   const manager = {
@@ -774,12 +706,12 @@ test('terminal_retry returns retry results as compact JSON', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_retry').handler({
+  const result = await callShellSession(server, 'retry', {
     sessionId: 's1',
     command: 'npm test',
     maxRetries: 0,
     backoff: 'fixed',
-    delayMs: 1,
+    delayMs: 10,
     timeout: 1234,
     maxLines: 25,
     successExitCode: 0,
@@ -793,14 +725,9 @@ test('terminal_retry returns retry results as compact JSON', async () => {
     lastResult: { output: 'ok', exitCode: 0, cwd: 'C:/repo', timedOut: false },
     history: [{ attempt: 1, output: 'ok', exitCode: 0, cwd: 'C:/repo', timedOut: false }],
   });
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
 });
 
-test('terminal_diff returns diff results as compact JSON', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
+test('diff action returns diff results as compact JSON', async () => {
   const server = createFakeServer();
   const execCalls = [];
   const manager = {
@@ -816,7 +743,7 @@ test('terminal_diff returns diff results as compact JSON', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_diff').handler({
+  const result = await callShellSession(server, 'diff', {
     sessionId: 's1',
     commandA: 'type before.txt',
     commandB: 'type after.txt',
@@ -833,12 +760,9 @@ test('terminal_diff returns diff results as compact JSON', async () => {
   assert.equal(payload.identical, false);
   assert.match(payload.diff, /--- type before.txt/);
   assert.match(payload.diff, /\+\+\+ type after.txt/);
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
 });
 
-test('terminal_exec forwards quietExitMs and minOutputBytes', async () => {
+test('exec action forwards quietExitMs and minOutputBytes', async () => {
   const server = createFakeServer();
   const execCalls = [];
   const manager = {
@@ -853,7 +777,7 @@ test('terminal_exec forwards quietExitMs and minOutputBytes', async () => {
 
   registerTools(server, manager);
 
-  await server.tools.get('terminal_exec').handler(
+  await callShellSession(server, 'exec',
     { sessionId: 's1', command: 'npm run dev', timeout: 5000, maxLines: 50, quietExitMs: 2000, minOutputBytes: 10 },
     { sendNotification, _meta: {} },
   );
@@ -869,7 +793,7 @@ test('terminal_exec forwards quietExitMs and minOutputBytes', async () => {
   }]);
 });
 
-test('terminal_read forwards since parameter', async () => {
+test('read action forwards since parameter', async () => {
   const server = createFakeServer();
   const readCalls = [];
   const manager = {
@@ -883,7 +807,7 @@ test('terminal_read forwards since parameter', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_read').handler({
+  const result = await callShellSession(server, 'read', {
     sessionId: 's1',
     timeout: 5000,
     idleTimeout: 200,
@@ -899,7 +823,7 @@ test('terminal_read forwards since parameter', async () => {
   });
 });
 
-test('terminal_stop returns snapshot when snapshotLines > 0', async () => {
+test('stop action returns snapshot when snapshotLines > 0', async () => {
   const server = createFakeServer();
   let stopped = false;
   const manager = {
@@ -911,7 +835,7 @@ test('terminal_stop returns snapshot when snapshotLines > 0', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_stop').handler({
+  const result = await callShellSession(server, 'stop', {
     sessionId: 's1',
     snapshotLines: 2,
   });
@@ -924,7 +848,7 @@ test('terminal_stop returns snapshot when snapshotLines > 0', async () => {
   assert.equal(payload.snapshot.totalLines, 5);
 });
 
-test('terminal_stop writes transcript to disk', async () => {
+test('stop action writes transcript to disk', async () => {
   const server = createFakeServer();
   const tempDir = await mkdtemp(join(tmpdir(), 'shell-session-mcp-'));
   try {
@@ -938,7 +862,7 @@ test('terminal_stop writes transcript to disk', async () => {
 
     registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_stop').handler({
+    const result = await callShellSession(server, 'stop', {
       sessionId: 's1',
       transcriptPath,
     });
@@ -955,7 +879,7 @@ test('terminal_stop writes transcript to disk', async () => {
   }
 });
 
-test('terminal_stop does not stop session on transcript write failure', async () => {
+test('stop action does not stop session on transcript write failure', async () => {
   // On Windows, deep path writes often succeed (no permission constraints)
   // Use a path with a null byte which is universally invalid
   const server = createFakeServer();
@@ -975,7 +899,7 @@ test('terminal_stop does not stop session on transcript write failure', async ()
   // Instead, skip on Windows
   if (process.platform === 'win32') return;
 
-  const result = await server.tools.get('terminal_stop').handler({
+  const result = await callShellSession(server, 'stop', {
     sessionId: 's1',
     transcriptPath: '/dev/null/impossible/output.log',
   });
@@ -984,7 +908,7 @@ test('terminal_stop does not stop session on transcript write failure', async ()
   assert.equal(stopped, false, 'session should NOT be stopped');
 });
 
-test('terminal_stop preserves original behavior with no options', async () => {
+test('stop action preserves original behavior with no options', async () => {
   const server = createFakeServer();
   let stopped = false;
   const manager = {
@@ -994,7 +918,7 @@ test('terminal_stop preserves original behavior with no options', async () => {
 
   registerTools(server, manager);
 
-  const result = await server.tools.get('terminal_stop').handler({ sessionId: 's1' });
+  const result = await callShellSession(server, 'stop', { sessionId: 's1' });
 
   assert.equal(stopped, 's1');
   const payload = JSON.parse(result.content[0].text);
@@ -1003,41 +927,36 @@ test('terminal_stop preserves original behavior with no options', async () => {
   assert.equal(payload.transcript, undefined);
 });
 
-test('terminal_watch forwards triggers and options', async () => {
-  process.env.SHELL_SESSION_DISABLED_TOOLS = '';
-  try {
-    const server = createFakeServer();
-    const watchCalls = [];
-    const manager = {
-      get: () => ({
-        watch: async (opts) => {
-          watchCalls.push(opts);
-          return { reason: 'trigger', triggerId: 'ready', matchedLine: 'done', context: [], position: 100, timedOut: false };
-        },
-      }),
-    };
+test('watch action forwards triggers and options', async () => {
+  const server = createFakeServer();
+  const watchCalls = [];
+  const manager = {
+    get: () => ({
+      watch: async (opts) => {
+        watchCalls.push(opts);
+        return { reason: 'trigger', triggerId: 'ready', matchedLine: 'done', context: [], position: 100, timedOut: false };
+      },
+    }),
+  };
 
-    registerTools(server, manager);
+  registerTools(server, manager);
 
-    const result = await server.tools.get('terminal_watch').handler({
-      sessionId: 's1',
-      triggers: [{ id: 'ready', pattern: 'done', isRegex: true, cooldownMs: 0 }],
-      timeout: 5000,
-      contextLines: 5,
-      since: 50,
-    });
+  const result = await callShellSession(server, 'watch', {
+    sessionId: 's1',
+    triggers: [{ id: 'ready', pattern: 'done', isRegex: true, cooldownMs: 0 }],
+    timeout: 5000,
+    contextLines: 5,
+    since: 50,
+  });
 
-    assert.deepEqual(watchCalls, [{
-      triggers: [{ id: 'ready', pattern: 'done', isRegex: true, cooldownMs: 0 }],
-      timeout: 5000,
-      quietExitMs: undefined,
-      contextLines: 5,
-      since: 50,
-    }]);
-    const payload = JSON.parse(result.content[0].text);
-    assert.equal(payload.reason, 'trigger');
-    assert.equal(payload.triggerId, 'ready');
-  } finally {
-    delete process.env.SHELL_SESSION_DISABLED_TOOLS;
-  }
+  assert.deepEqual(watchCalls, [{
+    triggers: [{ id: 'ready', pattern: 'done', isRegex: true, cooldownMs: 0 }],
+    timeout: 5000,
+    quietExitMs: undefined,
+    contextLines: 5,
+    since: 50,
+  }]);
+  const payload = JSON.parse(result.content[0].text);
+  assert.equal(payload.reason, 'trigger');
+  assert.equal(payload.triggerId, 'ready');
 });

@@ -38,7 +38,7 @@ function escapeRegExp(value) {
 }
 
 /**
- * Key name to escape sequence mapping for terminal_send_key.
+ * Key name to escape sequence mapping for shell_session action="send_key".
  */
 const KEY_MAP = {
   'ctrl+c': '\x03',
@@ -114,7 +114,7 @@ export class PtySession {
     this._historyTotalLines = 0;
     /** Partial line not yet terminated by newline */
     this._historyPartial = '';
-    /** Byte offset for unread output returned by terminal_read */
+    /** Byte offset for unread output returned by shell_session action="read" */
     this._readCursor = 0;
     /** @type {((data: string) => void)[]} */
     this._dataListeners = [];
@@ -197,7 +197,7 @@ export class PtySession {
    */
   async exec({ command, timeout = 30000, maxLines = DEFAULT_EXEC_MAX_LINES, quietExitMs, minOutputBytes = 1, sendNotification, progressToken }) {
     if (this.busy) {
-      throw new Error(`Session ${this.id} is busy with a background command. Wait for it to finish, or use terminal_read to check output, or terminal_send_key("ctrl+c") to abort it.`);
+      throw new Error(`Session ${this.id} is busy with a background command. Wait for it to finish, or use shell_session action="read" to check output, or action="send_key" with key "ctrl+c" to abort it.`);
     }
     if (!this.alive) {
       throw new Error(`Session ${this.id} is no longer alive.`);
@@ -235,7 +235,7 @@ export class PtySession {
         cwd: this.cwd,
         timedOut,
         ...(quietExited && { quietExited: true }),
-        ...((timedOut || quietExited) && { hint: 'Command is still running in the background. Session remains busy. Use terminal_read to get new output, or terminal_send_key("ctrl+c") to abort.' }),
+        ...((timedOut || quietExited) && { hint: 'Command is still running in the background. Session remains busy. Use shell_session action="read" to get new output, or action="send_key" with key "ctrl+c" to abort.' }),
       };
     } catch (err) {
       this.busy = false;
@@ -583,7 +583,7 @@ export class PtySession {
   }
 
   /**
-   * Get session metadata for terminal_list.
+   * Get session metadata for shell_session action="list".
    * @param {object} [opts]
    * @param {boolean} [opts.verbose=true]
    */

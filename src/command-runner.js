@@ -386,7 +386,7 @@ function formatStartError({ cmd, err }) {
     return baseMessage;
   }
 
-  return `${baseMessage}. Verify it is installed and on PATH for the server process. For shell built-ins, pipes, or redirections, use shell:true. Alternatively, start an interactive session with terminal_start.`;
+  return `${baseMessage}. Verify it is installed and on PATH for the server process. For shell built-ins, pipes, or redirections, use shell:true. Alternatively, start an interactive session with shell_session action="start".`;
 }
 
 export function getStructuredParserHint({ cmd, args, ok, parseRequested, parsed, stdout }) {

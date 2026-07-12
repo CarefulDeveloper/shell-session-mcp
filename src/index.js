@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SessionManager } from './session-manager.js';
-import { registerTools } from './tools.js';
+import { SHELL_SESSION_INSTRUCTIONS, registerTools } from './tools.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
@@ -19,6 +19,8 @@ export function createSandboxServer() {
   const server = new McpServer({
     name: 'shell-session-mcp',
     version,
+  }, {
+    instructions: SHELL_SESSION_INSTRUCTIONS,
   });
   const manager = new SessionManager();
   registerTools(server, manager);
@@ -31,6 +33,8 @@ async function main() {
   const server = new McpServer({
     name: 'shell-session-mcp',
     version,
+  }, {
+    instructions: SHELL_SESSION_INSTRUCTIONS,
   });
   registerTools(server, manager);
 

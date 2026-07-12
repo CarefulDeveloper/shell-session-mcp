@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.39] - 2026-07-12
+
+### Changed
+- **Breaking change**: MCP registration now exposes a single `shell_session` tool instead of individual `terminal_*` tools and `terminal_extra`.
+- Added layered `shell_session` help: call `{ "action": "help" }` for the action list, then `{ "action": "help", "args": { "actions": ["write", "read"] } }` for selected action parameters and examples.
+- Reworked README and Smithery tool examples around the single-tool action architecture.
+
+## [1.2.38] - 2026-07-12
+
+### Changed
+- Re-published package metadata and README with the canonical GitHub repository links.
+
 ## [1.2.37] - 2026-07-12
 
 ### Changed

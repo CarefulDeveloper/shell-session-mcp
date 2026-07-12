@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SessionManager } from '../src/session-manager.js';
-import { registerTools } from '../src/tools.js';
+import { SHELL_SESSION_INSTRUCTIONS, registerTools } from '../src/tools.js';
 
 const PORT = 3456;
 const HTTP_BAD_REQUEST = 400;
@@ -41,7 +41,10 @@ async function closeMcpResources(server, transport) {
 }
 
 function createServer() {
-  const server = new McpServer({ name: 'shell-session-mcp', version: SERVER_CARD.serverInfo.version });
+  const server = new McpServer(
+    { name: 'shell-session-mcp', version: SERVER_CARD.serverInfo.version },
+    { instructions: SHELL_SESSION_INSTRUCTIONS },
+  );
   const manager = new SessionManager();
   registerTools(server, manager);
   return server;

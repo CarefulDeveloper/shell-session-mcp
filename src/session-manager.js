@@ -69,7 +69,7 @@ export class SessionManager {
   get(id) {
     const session = this._sessions.get(id);
     if (!session) {
-      throw new Error(`Session "${id}" not found. Use terminal_list to see active sessions.`);
+      throw new Error(`Session "${id}" not found. Use shell_session action="list" to see active sessions.`);
     }
     return session;
   }

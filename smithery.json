@@ -1,7 +1,7 @@
 {
   "name": "carefuldeveloper/shell-session",
   "description": "Persistent interactive shell sessions for MCP agents",
-  "version": "1.2.37",
+  "version": "1.2.39",
   "repository": "https://github.com/CarefulDeveloper/shell-session-mcp",
   "tags": [
     "terminal",
@@ -11,11 +11,12 @@
   ],
   "toolExamples": [
     {
-      "name": "run_command",
+      "name": "shell_session",
       "args": {
-        "command": "ls -la"
+        "action": "help",
+        "args": {}
       },
-      "description": "List all files in the current directory with details"
+      "description": "Show the shell_session action catalog before choosing an interactive workflow"
     }
   ]
 }

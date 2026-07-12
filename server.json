@@ -6,12 +6,12 @@
     "url": "https://github.com/CarefulDeveloper/shell-session-mcp",
     "source": "github"
   },
-  "version": "1.2.37",
+  "version": "1.2.39",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@pkgpub/shell-session-mcp",
-      "version": "1.2.37",
+      "version": "1.2.39",
       "transport": {
         "type": "stdio"
       }

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { writeFile, appendFile, mkdir, readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_TIMEOUT_MS, runCommand } from './command-runner.js';
@@ -21,6 +20,12 @@ const READ_ONLY_PAGED_COMMANDS = new Set(['tasklist', 'where', 'which']);
 const READ_ONLY_GIT_SUBCOMMANDS = new Set(['branch', 'diff', 'log', 'ls-files', 'remote', 'rev-parse', 'status']);
 const MAX_TERMINAL_WRITE_SOURCE_BYTES = 1024 * 1024;
 const MAX_TEMPLATE_PLACEHOLDERS = 32;
+export const SHELL_SESSION_INSTRUCTIONS = [
+  'Use this MCP server only for interactive or persistent shell work.',
+  'Good fits include SSH logins that prompt for credentials, terminal programs that require typed input over time, REPLs, long-running dev servers, prompt/response workflows, special keys, and session state that must carry across steps.',
+  'For ordinary non-interactive commands, prefer the client/system command-line execution tool instead of this MCP server.',
+].join('\n');
+const SHELL_SESSION_DESCRIPTION = 'Manage interactive or persistent shell sessions. First call action="help" when unsure.';
 
 /**
  * Format a filesystem error into a human-readable message with the error code.
@@ -60,7 +65,7 @@ function assertPagedCommandIsReadOnly(cmd, args = []) {
     if (READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return;
   }
 
-  throw new Error('terminal_run_paged only supports read-only commands: git (branch, diff, log, ls-files, remote, rev-parse, status), tasklist, where, which.');
+  throw new Error('shell_session action "run_paged" only supports read-only commands: git (branch, diff, log, ls-files, remote, rev-parse, status), tasklist, where, which.');
 }
 
 function assertReadTimeouts(timeout, idleTimeout) {
@@ -87,7 +92,7 @@ async function resolveTerminalWriteData({ type = 'text', data }, session) {
     };
   }
 
-  throw new Error(`Unknown terminal_write type: "${type}".`);
+  throw new Error(`Unknown shell_session write type: "${type}".`);
 }
 
 async function expandTerminalWriteTemplate(template, session) {
@@ -311,29 +316,14 @@ function selectColumnRange(lines, startIndex, startColumn, endIndex, endColumn) 
   return output;
 }
 
-/**
- * Register all MCP tools on the server.
- * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} server
- * @param {import('./session-manager.js').SessionManager} manager
- */
-export function registerTools(server, manager) {
-  const DEFAULT_EXTRA = 'terminal_run_paged,terminal_retry,terminal_diff,terminal_resize,terminal_send_key,terminal_get_history,terminal_write_file,terminal_watch';
-  const disabledTools = process.env.SHELL_SESSION_DISABLED_TOOLS ?? process.env.SMART_TERMINAL_DISABLED_TOOLS ?? DEFAULT_EXTRA;
-  const _off = new Set(
-    disabledTools.split(',').map(s => s.trim()).filter(Boolean)
-  );
-  const _extras = new Map();
-  const tool = (name, desc, schema, handler) => {
-    if (_off.has(name)) {
-      _extras.set(name, { description: desc, schema, handler });
-      return;
-    }
-    server.tool(name, desc, schema, handler);
+function createActionRegistry(manager) {
+  const actions = new Map();
+  const action = (name, description, schema, handler, examples) => {
+    actions.set(name, { name, description, schema, handler, examples });
   };
 
-  // --- terminal_start ---
-  tool(
-    'terminal_start',
+  action(
+    'start',
     'Start a terminal session. Auto-detects shell if omitted.',
     {
       shell: z.string().optional().describe('Absolute shell executable path'),
@@ -364,16 +354,16 @@ export function registerTools(server, manager) {
           }
         }
         const hint = shell
-          ? '\n\nHint: call terminal_start with NO shell parameter to auto-detect the best available shell.'
+          ? '\n\nHint: call shell_session with action="start" and omit args.shell to auto-detect the best available shell.'
           : '';
         return errorContent(`${err.message}${hint}`);
       }
-    }
+    },
+    [{ action: 'start', args: { cwd: 'F:\\VSWorkSpace\\AICoding', name: 'main' } }]
   );
 
-  // --- terminal_exec ---
-  tool(
-    'terminal_exec',
+  action(
+    'exec',
     'Run a command in a session and wait for completion.',
     {
       sessionId: z.string(),
@@ -397,12 +387,12 @@ export function registerTools(server, manager) {
         progressToken: extra._meta?.progressToken,
       });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'exec', args: { sessionId: 'calm-reef', command: 'npm test', timeout: 120000 } }]
   );
 
-  // --- terminal_run ---
-  tool(
-    'terminal_run',
+  action(
+    'run',
     'Run a binary directly. shell=true for built-ins/pipes/redirects.',
     {
       cmd: z.string(),
@@ -434,12 +424,12 @@ export function registerTools(server, manager) {
         shell,
       });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'run', args: { cmd: 'node', args: ['--version'], parse: false } }]
   );
 
-  // --- terminal_run_paged ---
-  tool(
-    'terminal_run_paged',
+  action(
+    'run_paged',
     'Run a read-only command and return one page of output.',
     {
       cmd: z.string(),
@@ -481,12 +471,12 @@ export function registerTools(server, manager) {
           hasNext: pagination.hasNext,
         },
       });
-    }
+    },
+    [{ action: 'run_paged', args: { cmd: 'git', args: ['status'], page: 0, pageSize: 80 } }]
   );
 
-  // --- terminal_write ---
-  tool(
-    'terminal_write',
+  action(
+    'write',
     'Write data to a terminal session.',
     {
       sessionId: z.string(),
@@ -503,12 +493,12 @@ export function registerTools(server, manager) {
         type: resolved.source,
         bytes: Buffer.byteLength(resolved.data, 'utf8'),
       });
-    }
+    },
+    [{ action: 'write', args: { sessionId: 'calm-reef', type: 'template', data: '${file:info.txt::2}\\r' } }]
   );
 
-  // --- terminal_read ---
-  tool(
-    'terminal_read',
+  action(
+    'read',
     'Read new output from a terminal session.',
     {
       sessionId: z.string(),
@@ -523,12 +513,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       const result = await session.read({ timeout, idleTimeout, maxLines, since });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'read', args: { sessionId: 'calm-reef', since: 5000, timeout: 5000 } }]
   );
 
-  // --- terminal_get_history ---
-  tool(
-    'terminal_get_history',
+  action(
+    'get_history',
     'Get past output from a terminal session.',
     {
       sessionId: z.string(),
@@ -540,12 +530,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       const result = session.getHistory({ offset, limit: maxLines, format });
       return jsonContent({ sessionId, ...result });
-    }
+    },
+    [{ action: 'get_history', args: { sessionId: 'calm-reef', offset: 0, maxLines: 100, format: 'text' } }]
   );
 
-  // --- terminal_resize ---
-  tool(
-    'terminal_resize',
+  action(
+    'resize',
     'Resize terminal dimensions.',
     {
       sessionId: z.string(),
@@ -556,12 +546,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       session.resize(cols, rows);
       return jsonContent({ success: true, cols, rows });
-    }
+    },
+    [{ action: 'resize', args: { sessionId: 'calm-reef', cols: 160, rows: 40 } }]
   );
 
-  // --- terminal_send_key ---
-  tool(
-    'terminal_send_key',
+  action(
+    'send_key',
     'Send a special key (Enter, Tab, Escape, Ctrl-C etc.).',
     {
       sessionId: z.string(),
@@ -571,12 +561,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       session.sendKey(key);
       return jsonContent({ success: true, key });
-    }
+    },
+    [{ action: 'send_key', args: { sessionId: 'calm-reef', key: 'ctrl+c' } }]
   );
 
-  // --- terminal_wait ---
-  tool(
-    'terminal_wait',
+  action(
+    'wait',
     'Wait for a pattern to appear in terminal output.',
     {
       sessionId: z.string(),
@@ -596,12 +586,12 @@ export function registerTools(server, manager) {
         progressToken: extra._meta?.progressToken,
       });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'wait', args: { sessionId: 'calm-reef', pattern: 'ready', timeout: 60000 } }]
   );
 
-  // --- terminal_watch ---
-  tool(
-    'terminal_watch',
+  action(
+    'watch',
     'Wait for a pattern match in session output.',
     {
       sessionId: z.string(),
@@ -624,12 +614,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       const result = await session.watch({ triggers, timeout, quietExitMs, contextLines, since });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'watch', args: { sessionId: 'calm-reef', triggers: [{ id: 'ready', pattern: 'ready', isRegex: false }] } }]
   );
 
-  // --- terminal_retry ---
-  tool(
-    'terminal_retry',
+  action(
+    'retry',
     'Retry a command with backoff.',
     {
       sessionId: z.string(),
@@ -655,12 +645,12 @@ export function registerTools(server, manager) {
         successPattern,
       });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'retry', args: { sessionId: 'calm-reef', command: 'npm test', maxRetries: 2 } }]
   );
 
-  // --- terminal_diff ---
-  tool(
-    'terminal_diff',
+  action(
+    'diff',
     'Run two commands and return a unified diff.',
     {
       sessionId: z.string(),
@@ -674,12 +664,12 @@ export function registerTools(server, manager) {
       const session = manager.get(sessionId);
       const result = await execAndDiff(session, { commandA, commandB, timeout, maxLines, contextLines });
       return jsonContent(result);
-    }
+    },
+    [{ action: 'diff', args: { sessionId: 'calm-reef', commandA: 'git status --short', commandB: 'git diff --stat' } }]
   );
 
-  // --- terminal_stop ---
-  tool(
-    'terminal_stop',
+  action(
+    'stop',
     'Stop a terminal session.',
     {
       sessionId: z.string(),
@@ -722,12 +712,12 @@ export function registerTools(server, manager) {
         ...(snapshot && { snapshot }),
         ...(transcript && { transcript }),
       });
-    }
+    },
+    [{ action: 'stop', args: { sessionId: 'calm-reef', snapshotLines: 20 } }]
   );
 
-  // --- terminal_list ---
-  tool(
-    'terminal_list',
+  action(
+    'list',
     'List active terminal sessions.',
     {
       verbose: z.boolean().default(true),
@@ -735,12 +725,12 @@ export function registerTools(server, manager) {
     async ({ verbose = true }) => {
       const sessions = manager.list({ verbose });
       return jsonContent({ sessions, count: sessions.length });
-    }
+    },
+    [{ action: 'list', args: { verbose: true } }]
   );
 
-  // --- terminal_write_file ---
-  tool(
-    'terminal_write_file',
+  action(
+    'write_file',
     'Write content to a file.',
     {
       sessionId: z.string(),
@@ -773,47 +763,121 @@ export function registerTools(server, manager) {
         size,
         append,
       });
-    }
+    },
+    [{ action: 'write_file', args: { sessionId: 'calm-reef', path: 'notes.txt', content: 'done\\n' } }]
   );
 
-  // --- terminal_extra (meta-tool for disabled tools) ---
-  if (_extras.size > 0) {
-    const names = [..._extras.keys()].join(', ');
-    server.tool(
-      'terminal_extra',
-      `${_extras.size} more tools: ${names}. list=true for full schemas, or pass tool + args to call.`,
-      {
-        list: z.boolean().default(false),
-        tool: z.string().optional(),
-        args: z.record(z.any()).optional(),
-      },
-      async (params, extra) => {
-        if (params.list) {
-          const catalog = {};
-          for (const [n, def] of _extras) {
-            const s = zodToJsonSchema(z.object(def.schema));
-            catalog[n] = { description: def.description, parameters: s.properties || {}, required: s.required || [] };
-          }
-          return jsonContent(catalog);
-        }
+  return actions;
+}
 
-        if (!params.tool) {
-          return errorContent(`Pass list=true to see schemas, or specify tool. Available: ${names}`);
-        }
-
-        const def = _extras.get(params.tool);
-        if (!def) return errorContent(`Unknown tool "${params.tool}". Available: ${names}`);
-
-        try {
-          const validated = z.object(def.schema).parse(params.args || {});
-          return await def.handler(validated, extra);
-        } catch (err) {
-          if (err instanceof z.ZodError) {
-            return errorContent(`Invalid args for ${params.tool}: ${err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')}`);
-          }
-          throw err;
-        }
-      }
-    );
+function helpAction(actions, args = {}) {
+  const requested = Array.isArray(args.actions) ? args.actions : [];
+  if (requested.length === 0) {
+    return jsonContent({
+      usage: 'Call shell_session with { "action": "<name>", "args": { ... } }. For detailed parameters, call { "action": "help", "args": { "actions": ["write", "read"] } }.',
+      actions: [
+        { name: 'help', description: 'Show the action list or detailed help for selected actions.' },
+        ...[...actions.values()].map(({ name, description }) => ({ name, description })),
+      ],
+    });
   }
+
+  const details = {};
+  for (const name of requested) {
+    const def = actions.get(name);
+    if (!def) {
+      details[name] = {
+        error: `Unknown action "${name}".`,
+        availableActions: ['help', ...actions.keys()],
+      };
+      continue;
+    }
+
+    details[name] = {
+      description: def.description,
+      parameters: describeParameters(def.schema),
+      examples: def.examples,
+    };
+  }
+
+  return jsonContent({ actions: details });
+}
+
+function describeParameters(schema) {
+  const result = {};
+  for (const [name, field] of Object.entries(schema)) {
+    result[name] = {
+      type: describeZodType(field),
+      required: !isOptionalZodField(field),
+      ...(field.description ? { description: field.description } : {}),
+    };
+  }
+  return result;
+}
+
+function describeZodType(field) {
+  const typeName = field?._def?.typeName;
+  if (typeName === 'ZodDefault' || typeName === 'ZodOptional' || typeName === 'ZodNullable') {
+    return describeZodType(field._def.innerType);
+  }
+  if (typeName === 'ZodString') return 'string';
+  if (typeName === 'ZodNumber') return 'number';
+  if (typeName === 'ZodBoolean') return 'boolean';
+  if (typeName === 'ZodArray') return 'array';
+  if (typeName === 'ZodObject') return 'object';
+  if (typeName === 'ZodRecord') return 'object';
+  if (typeName === 'ZodEnum') return field._def.values.join('|');
+  return 'value';
+}
+
+function isOptionalZodField(field) {
+  const typeName = field?._def?.typeName;
+  return typeName === 'ZodDefault' || typeName === 'ZodOptional' || typeName === 'ZodNullable';
+}
+
+function formatZodError(actionName, err) {
+  const details = err.errors.map(e => `${e.path.join('.') || '(root)'}: ${e.message}`).join('; ');
+  return `Invalid args for action "${actionName}": ${details}. For help, call {"action":"help","args":{"actions":["${actionName}"]}}.`;
+}
+
+/**
+ * Register the single MCP tool on the server.
+ * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} server
+ * @param {import('./session-manager.js').SessionManager} manager
+ */
+export function registerTools(server, manager) {
+  const actions = createActionRegistry(manager);
+
+  server.tool(
+    'shell_session',
+    SHELL_SESSION_DESCRIPTION,
+    {
+      action: z.string().describe('Action name. Call action="help" first when unsure.'),
+      args: z.record(z.any()).default({}).describe('Action arguments. Use action="help" for details.'),
+    },
+    async ({ action, args = {} }, extra) => {
+      if (!action) {
+        return errorContent('Missing action. First call {"action":"help"}.');
+      }
+
+      if (action === 'help') {
+        return helpAction(actions, args);
+      }
+
+      const def = actions.get(action);
+      if (!def) {
+        return errorContent(`Unknown action "${action}". First call {"action":"help"} to see available actions.`);
+      }
+
+      try {
+        const validated = z.object(def.schema).parse(args || {});
+        return await def.handler(validated, extra || {});
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return errorContent(formatZodError(action, err));
+        }
+        throw err;
+      }
+    }
+  );
 }

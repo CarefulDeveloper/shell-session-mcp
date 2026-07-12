@@ -153,7 +153,7 @@ test('getHistory can return text mode with the same metadata', () => {
   });
 });
 
-test('getInfo can return minimal terminal_list metadata', () => {
+test('getInfo can return minimal list action metadata', () => {
   const session = createSession();
   session.id = 's1';
   session.name = 'main';
