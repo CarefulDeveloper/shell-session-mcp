@@ -106,7 +106,7 @@ Use `SHELL_SESSION_DISABLED_TOOLS` to customize which tools are extra, or set it
   "mcpServers": {
     "shell-session": {
       "command": "npx",
-      "args": ["-y", "shell-session-mcp@stable"],
+      "args": ["-y", "@pkgpub/shell-session-mcp@stable"],
       "env": { "SHELL_SESSION_DISABLED_TOOLS": "" }
     }
   }
@@ -138,13 +138,13 @@ Use `SHELL_SESSION_DISABLED_TOOLS` to customize which tools are extra, or set it
 Recommended: run the stable release directly via `npx`:
 
 ```bash
-npx shell-session-mcp@stable
+npx @pkgpub/shell-session-mcp@stable
 ```
 
 Or install globally:
 
 ```bash
-npm install -g shell-session-mcp
+npm install -g @pkgpub/shell-session-mcp
 ```
 
 Or clone for development:
@@ -166,7 +166,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "shell-session": {
       "command": "npx",
-      "args": ["-y", "shell-session-mcp@stable"]
+      "args": ["-y", "@pkgpub/shell-session-mcp@stable"]
     }
   }
 }
@@ -175,7 +175,7 @@ Add to your `claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add shell-session -- npx -y shell-session-mcp@stable
+claude mcp add shell-session -- npx -y @pkgpub/shell-session-mcp@stable
 ```
 
 ### Augment Code
@@ -188,14 +188,14 @@ Add to your Augment MCP settings:
     "Shell Session": {
       "command": "npx",
       "args": [
-        "shell-session-mcp@stable"
+        "@pkgpub/shell-session-mcp@stable"
       ]
     }
   }
 }
 ```
 
-If you want to pin an exact release instead of following the stable tag, replace `@stable` with a version such as `@1.0.1`.
+If you want to pin an exact release instead of following the stable tag, replace `@stable` with a version such as `@pkgpub/shell-session-mcp@1.0.1`.
 
 ## Tools
 

@@ -1,11 +1,11 @@
 {
-  "name": "shell-session-mcp",
-  "version": "1.2.36",
+  "name": "@pkgpub/shell-session-mcp",
+  "version": "1.2.37",
   "description": "Persistent interactive shell sessions for MCP agents",
   "mcpName": "io.github.local/shell-session",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/shell-session-mcp.git"
+    "url": "git+https://github.com/your-org/shell-session-mcp.git"
   },
   "type": "module",
   "main": "src/index.js",
@@ -15,7 +15,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test",
-    "stable": "npm dist-tag add shell-session-mcp@1.2.36 stable",
+    "stable": "npm dist-tag add @pkgpub/shell-session-mcp@1.2.37 stable",
     "release": "node scripts/publish.js"
   },
   "keywords": [

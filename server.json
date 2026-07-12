@@ -6,12 +6,12 @@
     "url": "https://github.com/your-org/shell-session-mcp",
     "source": "github"
   },
-  "version": "1.2.36",
+  "version": "1.2.37",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "shell-session-mcp",
-      "version": "1.2.36",
+      "identifier": "@pkgpub/shell-session-mcp",
+      "version": "1.2.37",
       "transport": {
         "type": "stdio"
       }

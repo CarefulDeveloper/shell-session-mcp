@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.37] - 2026-07-12
+
+### Changed
+- Published package metadata now uses the scoped npm package name `@pkgpub/shell-session-mcp`.
+- Updated npm install and MCP configuration examples to reference the scoped package.
+- Added npm package exclusions so local tarballs and editor/runtime files are not included in release archives.
+
 ## [1.2.36] - 2026-04-30
 
 ### Added
