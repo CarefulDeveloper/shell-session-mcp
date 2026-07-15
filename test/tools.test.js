@@ -141,6 +141,13 @@ test('shell_session returns help-oriented errors for invalid calls', async () =>
   assert.ok(invalidArgs.isError);
   assert.match(invalidArgs.content[0].text, /Invalid args for action "read"/);
   assert.match(invalidArgs.content[0].text, /"actions":\["read"\]/);
+
+  const unknownArg = await callShellSession(server, 'get_history', { sessionId: 's1', lines: 3 });
+  assert.ok(unknownArg.isError);
+  assert.match(unknownArg.content[0].text, /Invalid args for action "get_history"/);
+  assert.match(unknownArg.content[0].text, /Unrecognized key/);
+  assert.match(unknownArg.content[0].text, /lines/);
+  assert.match(unknownArg.content[0].text, /"actions":\["get_history"\]/);
 });
 
 test('start action returns compact session metadata', async () => {

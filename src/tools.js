@@ -874,7 +874,7 @@ export function registerTools(server, manager) {
       }
 
       try {
-        const validated = z.object(def.schema).parse(args || {});
+        const validated = z.object(def.schema).strict().parse(args || {});
         return await def.handler(validated, extra || {});
       } catch (err) {
         if (err instanceof z.ZodError) {
