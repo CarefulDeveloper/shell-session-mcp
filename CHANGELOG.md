@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.40] - 2026-07-16
+
+### Added
+- `write` responses now include a pre-write `position` cursor so callers can scope later waits to output produced after an interactive input.
+- `wait` accepts `since` to match only output emitted after a prior `write` or `read` position, avoiding false positives from older terminal output.
+
+### Changed
+- Clarified MCP help and README guidance for interactive sessions: `wait.pattern` is a regular expression; `watch.since` should use the `position` returned by `write`; terminal command submission should use `\r` or Enter, not `\n`; and `exec` is only for the original session shell, not SSH/REPL subshells.
+
+### Fixed
+- Unknown action arguments are now rejected instead of being silently ignored, so mistakes such as `get_history` with `lines` return a help-oriented validation error.
+- `wait.since` and `watch.since` now cover fast output that arrives after `write` but before the wait/watch call begins.
+
 ## [1.2.39] - 2026-07-12
 
 ### Changed

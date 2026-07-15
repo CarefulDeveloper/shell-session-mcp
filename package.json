@@ -1,6 +1,6 @@
 {
   "name": "@pkgpub/shell-session-mcp",
-  "version": "1.2.39",
+  "version": "1.2.40",
   "description": "Persistent interactive shell sessions for MCP agents",
   "mcpName": "io.github.carefuldeveloper/shell-session",
   "repository": {
@@ -15,7 +15,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test",
-    "stable": "npm dist-tag add @pkgpub/shell-session-mcp@1.2.39 stable",
+    "stable": "npm dist-tag add @pkgpub/shell-session-mcp@1.2.40 stable",
     "release": "node scripts/publish.js"
   },
   "keywords": [
