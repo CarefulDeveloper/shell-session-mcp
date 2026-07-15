@@ -104,9 +104,10 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   const server = createFakeServer();
   registerTools(server, {});
 
-  const result = await callShellSession(server, 'help', { actions: ['write', 'read', 'wait', 'watch'] });
+  const result = await callShellSession(server, 'help', { actions: ['exec', 'write', 'read', 'wait', 'watch'] });
   const payload = JSON.parse(result.content[0].text);
 
+  assert.match(payload.actions.exec.description, /not for SSH\/REPL subshells/);
   assert.match(payload.actions.write.parameters.data.description, /\$\{file:path::1-2\}/);
   assert.equal(payload.actions.write.parameters.sessionId.required, true);
   assert.equal(payload.actions.write.parameters.type.required, false);

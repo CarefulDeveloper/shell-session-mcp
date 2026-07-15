@@ -63,7 +63,7 @@ Poor use cases:
 |--------|---------|
 | `help` | Show the action list or detailed help for selected actions. |
 | `start` | Start a persistent terminal session. |
-| `exec` | Run a command inside an existing session and wait for completion. |
+| `exec` | Run a command in the original session shell; not for SSH/REPL subshells. |
 | `run` | Run a one-shot non-interactive command. Prefer the client/system command tool for ordinary cases. |
 | `run_paged` | Run a read-only command and return one page of output. |
 | `write` | Send text or template input to a session. |
@@ -109,6 +109,8 @@ Then run a command inside that session:
 ```json
 { "action": "exec", "args": { "sessionId": "calm-reef", "command": "pwd" } }
 ```
+
+`exec` wraps commands for the shell that started the session so it can detect completion, exit code, and working directory. Do not use it after entering an interactive subshell such as SSH, Python, Node, a database shell, or a container shell. In those contexts the remote or nested shell may not understand the wrapper commands, and the session can remain busy waiting for markers that will never be emitted. Use `write`, `read`, `wait`, and `watch` instead.
 
 ### Interactive REPL
 

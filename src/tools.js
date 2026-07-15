@@ -364,7 +364,7 @@ function createActionRegistry(manager) {
 
   action(
     'exec',
-    'Run a command in a session and wait for completion.',
+    'Run in the original shell; not for SSH/REPL subshells.',
     {
       sessionId: z.string(),
       command: z.string(),
