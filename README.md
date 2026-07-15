@@ -71,7 +71,7 @@ Poor use cases:
 | `get_history` | Read previous output from a session history. |
 | `resize` | Resize a terminal session. |
 | `send_key` | Send a special key such as Ctrl+C, Enter, Tab, or Escape. |
-| `wait` | Wait until session output matches a pattern. |
+| `wait` | Wait until session output matches a regular expression. |
 | `watch` | Wait for one of several trigger patterns in session output. |
 | `retry` | Retry a session command with bounded backoff. |
 | `diff` | Run two session commands and return a unified diff. |
@@ -135,7 +135,7 @@ Then run a command inside that session:
 ```
 
 ```json
-{ "action": "wait", "args": { "sessionId": "calm-reef", "pattern": "listening on port", "timeout": 60000 } }
+{ "action": "wait", "args": { "sessionId": "calm-reef", "pattern": "listening on port \\d+", "timeout": 60000 } }
 ```
 
 ### Watch Logs Without Polling

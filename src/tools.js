@@ -567,10 +567,10 @@ function createActionRegistry(manager) {
 
   action(
     'wait',
-    'Wait for a pattern to appear in terminal output.',
+    'Wait for a regular expression to match terminal output.',
     {
       sessionId: z.string(),
-      pattern: z.string(),
+      pattern: z.string().describe('Regular expression matched against terminal output'),
       timeout: z.number().int().min(1000).max(600000).default(30000),
       returnMode: z.enum(['tail', 'full', 'match-only']).default('tail'),
       tailLines: z.number().int().min(1).max(1000).default(50),
@@ -587,7 +587,7 @@ function createActionRegistry(manager) {
       });
       return jsonContent(result);
     },
-    [{ action: 'wait', args: { sessionId: 'calm-reef', pattern: 'ready', timeout: 60000 } }]
+    [{ action: 'wait', args: { sessionId: 'calm-reef', pattern: 'ready|listening on port \\d+', timeout: 60000 } }]
   );
 
   action(

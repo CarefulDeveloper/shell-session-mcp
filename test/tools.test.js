@@ -104,13 +104,14 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   const server = createFakeServer();
   registerTools(server, {});
 
-  const result = await callShellSession(server, 'help', { actions: ['write', 'read'] });
+  const result = await callShellSession(server, 'help', { actions: ['write', 'read', 'wait'] });
   const payload = JSON.parse(result.content[0].text);
 
   assert.match(payload.actions.write.parameters.data.description, /\$\{file:path::1-2\}/);
   assert.equal(payload.actions.write.parameters.sessionId.required, true);
   assert.equal(payload.actions.write.parameters.type.required, false);
   assert.equal(payload.actions.read.parameters.since.type, 'number');
+  assert.match(payload.actions.wait.parameters.pattern.description, /Regular expression/);
   assert.equal(Array.isArray(payload.actions.write.examples), true);
   assert.equal(payload.actions.write.examples.length, 1);
   assert.deepEqual(payload.actions.write.examples[0], {
