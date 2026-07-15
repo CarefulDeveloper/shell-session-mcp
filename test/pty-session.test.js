@@ -572,3 +572,23 @@ test('watch with since skips already-emitted output', async () => {
   assert.equal(result.reason, 'trigger');
   assert.equal(result.triggerId, 'found');
 });
+
+test('watch with since matches fast literal output after a write position', async () => {
+  const oldOutput = 'old WATCH_LITERAL_DOLLAR_$\n';
+  const newOutput = 'echo WATCH_LITERAL_DOLLAR_$\nWATCH_LITERAL_DOLLAR_$\n';
+  const session = createSession();
+  session.alive = true;
+  session._buffer = oldOutput + newOutput;
+  session._totalBytesEmitted = session._buffer.length;
+  session._dataListeners = [];
+
+  const result = await session.watch({
+    triggers: [{ id: 'literal', pattern: 'WATCH_LITERAL_DOLLAR_$', isRegex: false }],
+    timeout: 2000,
+    since: oldOutput.length,
+  });
+
+  assert.equal(result.reason, 'trigger');
+  assert.equal(result.triggerId, 'literal');
+  assert.equal(result.matchedLine, 'echo WATCH_LITERAL_DOLLAR_$');
+});

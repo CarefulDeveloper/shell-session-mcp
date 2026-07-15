@@ -142,11 +142,14 @@ The `write` response includes `position`, the absolute output byte position capt
 
 ### Watch Logs Without Polling
 
+When `watch` follows a `write`, pass the `position` returned by `write` as `watch.since`. That position is captured before the input is written, so `watch` can still match output that arrives after `write` but before the `watch` call starts.
+
 ```json
 {
   "action": "watch",
   "args": {
     "sessionId": "calm-reef",
+    "since": 5000,
     "triggers": [
       { "id": "ready", "pattern": "listening on port", "isRegex": false },
       { "id": "error", "pattern": "ERROR|FATAL", "isRegex": true }

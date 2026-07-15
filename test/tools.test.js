@@ -104,7 +104,7 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   const server = createFakeServer();
   registerTools(server, {});
 
-  const result = await callShellSession(server, 'help', { actions: ['write', 'read', 'wait'] });
+  const result = await callShellSession(server, 'help', { actions: ['write', 'read', 'wait', 'watch'] });
   const payload = JSON.parse(result.content[0].text);
 
   assert.match(payload.actions.write.parameters.data.description, /\$\{file:path::1-2\}/);
@@ -113,6 +113,8 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   assert.equal(payload.actions.read.parameters.since.type, 'number');
   assert.match(payload.actions.wait.parameters.pattern.description, /Regular expression/);
   assert.match(payload.actions.wait.parameters.since.description, /write before input/);
+  assert.match(payload.actions.watch.description, /since from write/);
+  assert.match(payload.actions.watch.parameters.since.description, /write before input/);
   assert.match(payload.actions.write.description, /pre-write output position/);
   assert.equal(Array.isArray(payload.actions.write.examples), true);
   assert.equal(payload.actions.write.examples.length, 1);

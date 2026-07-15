@@ -596,7 +596,7 @@ function createActionRegistry(manager) {
 
   action(
     'watch',
-    'Wait for a pattern match in session output.',
+    'Wait for trigger patterns; use since from write to include fast output.',
     {
       sessionId: z.string(),
       triggers: z.array(z.object({
@@ -612,14 +612,14 @@ function createActionRegistry(manager) {
       contextLines: z.number().int().min(0).max(50).default(3)
         .describe('Context lines before match'),
       since: z.number().int().min(0).optional()
-        .describe('Match after byte position'),
+        .describe('Position returned by write before input was sent, or by read'),
     },
     async ({ sessionId, triggers, timeout, quietExitMs, contextLines, since }) => {
       const session = manager.get(sessionId);
       const result = await session.watch({ triggers, timeout, quietExitMs, contextLines, since });
       return jsonContent(result);
     },
-    [{ action: 'watch', args: { sessionId: 'calm-reef', triggers: [{ id: 'ready', pattern: 'ready', isRegex: false }] } }]
+    [{ action: 'watch', args: { sessionId: 'calm-reef', since: 5000, triggers: [{ id: 'ready', pattern: 'ready', isRegex: false }] } }]
   );
 
   action(
