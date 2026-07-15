@@ -116,7 +116,7 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   assert.match(payload.actions.wait.parameters.since.description, /write before input/);
   assert.match(payload.actions.watch.description, /since from write/);
   assert.match(payload.actions.watch.parameters.since.description, /write before input/);
-  assert.match(payload.actions.write.description, /pre-write output position/);
+  assert.match(payload.actions.write.description, /pre-write position/);
   assert.equal(Array.isArray(payload.actions.write.examples), true);
   assert.equal(payload.actions.write.examples.length, 1);
   assert.deepEqual(payload.actions.write.examples[0], {
@@ -218,7 +218,9 @@ test('write help documents template placeholders', async () => {
 
   const result = await callShellSession(server, 'help', { actions: ['write'] });
   const payload = JSON.parse(result.content[0].text);
+  assert.match(payload.actions.write.description, /\\r\/Enter, not \\n/);
   const dataDescription = payload.actions.write.parameters.data.description;
+  assert.match(dataDescription, /Submit commands with \\r, not \\n/);
   assert.match(dataDescription, /\$\{file:path\}=whole file/);
   assert.match(dataDescription, /\$\{file:path::1\}/);
   assert.match(dataDescription, /=line 1/);

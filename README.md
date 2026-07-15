@@ -186,6 +186,8 @@ The `write` action supports `type: "text"` and `type: "template"`.
 
 `type: "text"` interprets common escapes such as `\r`, `\n`, and `\t`.
 
+To submit a command or line of terminal input, end it with `\r` or call `send_key` with `key: "enter"`. Do not use `\n` as Enter; this server writes to a PTY, and `\r` is the portable terminal submit key across PowerShell, pwsh, cmd, Unix shells, and SSH sessions.
+
 `type: "template"` expands file and environment placeholders server-side before writing to the PTY. This lets callers inject local file/env content without putting the expanded value in the tool arguments or response. It does not prevent the terminal program itself from echoing input.
 
 Supported placeholders:

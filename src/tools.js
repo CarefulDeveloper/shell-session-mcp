@@ -477,11 +477,11 @@ function createActionRegistry(manager) {
 
   action(
     'write',
-    'Write data and return the pre-write output position.',
+    'Write input, return pre-write position; use \\r/Enter, not \\n.',
     {
       sessionId: z.string(),
       type: z.enum(['text', 'template']).default('text'),
-      data: z.string().describe('Text or template. ${file:path}=whole file; ${file:path::1}=line 1; ${file:path::1-2}=lines 1-2; ${file:path::1:1-2:3}=line/col range; ${env:NAME}=env.'),
+      data: z.string().describe('Text or template. Submit commands with \\r, not \\n. ${file:path}=whole file; ${file:path::1}=line 1; ${file:path::1-2}=lines 1-2; ${file:path::1:1-2:3}=line/col range; ${env:NAME}=env.'),
     },
     async ({ sessionId, type, data }) => {
       const session = manager.get(sessionId);
