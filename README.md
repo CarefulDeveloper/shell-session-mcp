@@ -134,8 +134,10 @@ Then run a command inside that session:
 { "action": "write", "args": { "sessionId": "calm-reef", "data": "npm run dev\r" } }
 ```
 
+The `write` response includes `position`, the absolute output byte position captured before the input was written. Pass that value as `wait.since` to match only output produced after this write, including output that arrives before the `wait` call is made.
+
 ```json
-{ "action": "wait", "args": { "sessionId": "calm-reef", "pattern": "listening on port \\d+", "timeout": 60000 } }
+{ "action": "wait", "args": { "sessionId": "calm-reef", "pattern": "listening on port \\d+", "since": 5000, "timeout": 60000 } }
 ```
 
 ### Watch Logs Without Polling
@@ -212,6 +214,7 @@ Example:
 Use these actions when terminal output is large or long-running:
 
 - `read` with `since` to avoid re-reading old output.
+- `wait` with `since` from a prior `write` to avoid matching older output.
 - `wait` with `returnMode: "match-only"` when only a match result matters.
 - `watch` to avoid manual poll loops while waiting for log patterns.
 - `get_history` to revisit previous output without dumping the whole buffer.

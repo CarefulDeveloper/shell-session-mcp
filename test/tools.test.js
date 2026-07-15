@@ -112,6 +112,8 @@ test('shell_session help returns detailed parameters for selected actions', asyn
   assert.equal(payload.actions.write.parameters.type.required, false);
   assert.equal(payload.actions.read.parameters.since.type, 'number');
   assert.match(payload.actions.wait.parameters.pattern.description, /Regular expression/);
+  assert.match(payload.actions.wait.parameters.since.description, /write before input/);
+  assert.match(payload.actions.write.description, /pre-write output position/);
   assert.equal(Array.isArray(payload.actions.write.examples), true);
   assert.equal(payload.actions.write.examples.length, 1);
   assert.deepEqual(payload.actions.write.examples[0], {
@@ -225,7 +227,10 @@ test('write action writes text with escaped control characters', async () => {
     get: (sessionId) => ({
       id: sessionId,
       cwd: process.cwd(),
-      write: (data) => writes.push(data),
+      write: (data) => {
+        writes.push(data);
+        return 123;
+      },
     }),
   };
 
@@ -243,6 +248,7 @@ test('write action writes text with escaped control characters', async () => {
     sessionId: 's1',
     type: 'text',
     bytes: 6,
+    position: 123,
   });
 });
 
@@ -256,7 +262,10 @@ test('write action expands template file placeholders server-side', async () => 
       get: (sessionId) => ({
         id: sessionId,
         cwd: tempDir,
-        write: (data) => writes.push(data),
+        write: (data) => {
+          writes.push(data);
+          return 456;
+        },
       }),
     };
 
@@ -275,6 +284,7 @@ test('write action expands template file placeholders server-side', async () => 
       sessionId: 's1',
       type: 'template',
       bytes: 23,
+      position: 456,
     });
     assert.doesNotMatch(result.content[0].text, /secret-value/);
   } finally {
@@ -407,7 +417,10 @@ test('write action template expands environment placeholders server-side', async
       get: (sessionId) => ({
         id: sessionId,
         cwd: process.cwd(),
-        write: (data) => writes.push(data),
+        write: (data) => {
+          writes.push(data);
+          return 789;
+        },
       }),
     };
 
@@ -426,6 +439,7 @@ test('write action template expands environment placeholders server-side', async
       sessionId: 's1',
       type: 'template',
       bytes: 15,
+      position: 789,
     });
     assert.doesNotMatch(result.content[0].text, /from-env/);
   } finally {
@@ -670,6 +684,7 @@ test('wait action forwards returnMode and tailLines', async () => {
       timeout: 1234,
       returnMode: 'full',
       tailLines: 99,
+      since: 5000,
     },
     {
       sendNotification,
@@ -682,6 +697,7 @@ test('wait action forwards returnMode and tailLines', async () => {
     timeout: 1234,
     returnMode: 'full',
     tailLines: 99,
+    since: 5000,
     sendNotification,
     progressToken: 'progress-1',
   }]);

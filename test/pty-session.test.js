@@ -224,6 +224,46 @@ test('waitForPattern returns only the configured tail on timeout', async () => {
   });
 });
 
+test('waitForPattern with since ignores older buffered output', async () => {
+  const oldOutput = 'old ABC_abc\n';
+  const newOutput = 'new prompt\n';
+  const session = createWaitSession(oldOutput + newOutput);
+  session._totalBytesEmitted = session._buffer.length;
+
+  const result = await session.waitForPattern({
+    pattern: 'ABC_abc',
+    since: oldOutput.length,
+    tailLines: 5,
+    timeout: 20,
+  });
+
+  assert.deepEqual(result, {
+    output: 'new prompt',
+    matched: false,
+    timedOut: true,
+  });
+});
+
+test('waitForPattern with since can match output already emitted after that position', async () => {
+  const oldOutput = 'old prompt\n';
+  const newOutput = 'echo ABC_abc\nABC_abc\n';
+  const session = createWaitSession(oldOutput + newOutput);
+  session._totalBytesEmitted = session._buffer.length;
+
+  const result = await session.waitForPattern({
+    pattern: 'ABC_abc',
+    since: oldOutput.length,
+    tailLines: 5,
+    timeout: 20,
+  });
+
+  assert.deepEqual(result, {
+    output: 'echo ABC_abc\nABC_abc',
+    matched: true,
+    timedOut: false,
+  });
+});
+
 test('waitForPattern rejects invalid regex patterns', async () => {
   const session = createWaitSession('ready\n');
 

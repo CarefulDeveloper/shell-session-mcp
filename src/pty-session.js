@@ -247,16 +247,19 @@ export class PtySession {
   /**
    * Write raw data to PTY (for interactive programs).
    * @param {string} data
+   * @returns {number} Output byte position captured before the write.
    */
   write(data) {
     if (!this.alive) {
       throw new Error(`Session ${this.id} is no longer alive.`);
     }
+    const position = this._totalBytesEmitted;
     this.process.write(data);
     if (data.includes('\x03') || data.includes('\x04')) {
       this.busy = false;
       this._pendingMarker = null;
     }
+    return position;
   }
 
   /**
@@ -311,6 +314,7 @@ export class PtySession {
    * @param {number} [opts.timeout=30000]
    * @param {'tail'|'full'|'match-only'} [opts.returnMode='tail']
    * @param {number} [opts.tailLines=50]
+   * @param {number} [opts.since] - Absolute byte position; ignores older output
    * @param {Function} [opts.sendNotification]
    * @param {string|number} [opts.progressToken]
    * @returns {Promise<{ output: string, matched: boolean, timedOut: boolean }>}
@@ -320,6 +324,7 @@ export class PtySession {
     timeout = 30000,
     returnMode = DEFAULT_WAIT_RETURN_MODE,
     tailLines = DEFAULT_WAIT_TAIL_LINES,
+    since,
     sendNotification,
     progressToken,
   }) {
@@ -370,8 +375,13 @@ export class PtySession {
         }
       };
 
-      // Check existing buffer first
-      const existingClean = stripAnsi(this._buffer);
+      // Check existing buffer first, optionally only from an absolute output position.
+      const currentPosition = Number.isFinite(this._totalBytesEmitted) ? this._totalBytesEmitted : this._buffer.length;
+      const bufferStart = currentPosition - this._buffer.length;
+      const fromPos = since === undefined ? bufferStart : Math.max(since, bufferStart);
+      const offset = Math.max(0, fromPos - bufferStart);
+      const existingRaw = offset < this._buffer.length ? this._buffer.slice(offset) : '';
+      const existingClean = stripAnsi(existingRaw);
       this._appendToTailTracker(tailTracker, existingClean, tailLines);
       if (regex.test(existingClean)) {
         clearTimeout(timer);
@@ -382,7 +392,7 @@ export class PtySession {
         });
         return;
       }
-      collected = this._buffer;
+      collected = existingRaw;
 
       this._dataListeners.push(onData);
     });

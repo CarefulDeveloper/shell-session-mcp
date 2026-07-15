@@ -477,7 +477,7 @@ function createActionRegistry(manager) {
 
   action(
     'write',
-    'Write data to a terminal session.',
+    'Write data and return the pre-write output position.',
     {
       sessionId: z.string(),
       type: z.enum(['text', 'template']).default('text'),
@@ -486,12 +486,13 @@ function createActionRegistry(manager) {
     async ({ sessionId, type, data }) => {
       const session = manager.get(sessionId);
       const resolved = await resolveTerminalWriteData({ type, data }, session);
-      session.write(resolved.data);
+      const position = session.write(resolved.data);
       return jsonContent({
         success: true,
         sessionId,
         type: resolved.source,
         bytes: Buffer.byteLength(resolved.data, 'utf8'),
+        position,
       });
     },
     [{ action: 'write', args: { sessionId: 'calm-reef', type: 'template', data: '${file:info.txt::2}\\r' } }]
@@ -574,20 +575,23 @@ function createActionRegistry(manager) {
       timeout: z.number().int().min(1000).max(600000).default(30000),
       returnMode: z.enum(['tail', 'full', 'match-only']).default('tail'),
       tailLines: z.number().int().min(1).max(1000).default(50),
+      since: z.number().int().min(0).optional()
+        .describe('Position returned by write before input was sent, or by read'),
     },
-    async ({ sessionId, pattern, timeout, returnMode, tailLines }, extra) => {
+    async ({ sessionId, pattern, timeout, returnMode, tailLines, since }, extra) => {
       const session = manager.get(sessionId);
       const result = await session.waitForPattern({
         pattern,
         timeout,
         returnMode,
         tailLines,
+        since,
         sendNotification: extra.sendNotification,
         progressToken: extra._meta?.progressToken,
       });
       return jsonContent(result);
     },
-    [{ action: 'wait', args: { sessionId: 'calm-reef', pattern: 'ready|listening on port \\d+', timeout: 60000 } }]
+    [{ action: 'wait', args: { sessionId: 'calm-reef', pattern: 'ready|listening on port \\d+', since: 5000, timeout: 60000 } }]
   );
 
   action(
